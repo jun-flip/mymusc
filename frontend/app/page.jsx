@@ -1,3 +1,4 @@
+'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 
@@ -22,7 +23,6 @@ function PseudoRandomEQ({ isPlaying, barCount = 96 }) {
     const animate = () => {
       if (!running) return;
       setHeights(prev => prev.map((h, i) => {
-        // Плавно меняем высоту с небольшой случайностью
         const t = Date.now() / 700 + i * 0.15;
         const base = 18 + 62 * (0.5 + 0.5 * Math.sin(t + Math.sin(i)));
         const noise = 8 * Math.sin(t * (i % 7 + 1));
@@ -54,7 +54,6 @@ function PseudoRandomEQ({ isPlaying, barCount = 96 }) {
   );
 }
 
-// SVG-иконки Material UI
 const IconPrev = ({color = '#ff5500'}) => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 18V6M19 18L10 12L19 6V18Z" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
@@ -86,8 +85,8 @@ const IconDelete = ({color = 'currentColor'}) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 7V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v2m5 4v6m4-6v6" stroke={color} strokeWidth="2" strokeLinecap="round"/></svg>
 );
 
-function App() {
-  const [query, setQuery] = useState(() => localStorage.getItem('lastQuery') || '');
+function Page() {
+  const [query, setQuery] = useState('');
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -100,29 +99,38 @@ function App() {
   const [queue, setQueue] = useState([]); // очередь треков
   const PLAYLIST_KEY = 'audiofeel_playlist';
   const PLAYLIST_TTL = 1000 * 60 * 60 * 24 * 30; // 30 дней
-  const [playlist, setPlaylist] = useState(() => {
-    try {
-      const raw = localStorage.getItem(PLAYLIST_KEY);
-      if (!raw) return [];
-      const { tracks, ts } = JSON.parse(raw);
-      if (Date.now() - ts > PLAYLIST_TTL) {
-        localStorage.removeItem(PLAYLIST_KEY);
-        return [];
-      }
-      return tracks || [];
-    } catch { return []; }
-  });
+  const [playlist, setPlaylist] = useState([]);
   const [playingFromPlaylist, setPlayingFromPlaylist] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+
+  // Инициализация query и playlist из localStorage только на клиенте
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setQuery(localStorage.getItem('lastQuery') || '');
+      try {
+        const raw = localStorage.getItem(PLAYLIST_KEY);
+        if (raw) {
+          const { tracks, ts } = JSON.parse(raw);
+          if (Date.now() - ts <= PLAYLIST_TTL) {
+            setPlaylist(tracks || []);
+          } else {
+            localStorage.removeItem(PLAYLIST_KEY);
+          }
+        }
+      } catch {}
+    }
+  }, []);
 
   // Автофокус на поле поиска
   useEffect(() => { inputRef.current && inputRef.current.focus(); }, []);
 
   // Сохранять последний запрос
-  useEffect(() => { localStorage.setItem('lastQuery', query); }, [query]);
+  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('lastQuery', query); }, [query]);
 
   // Сохранять плейлист
   useEffect(() => {
-    localStorage.setItem(PLAYLIST_KEY, JSON.stringify({ tracks: playlist, ts: Date.now() }));
+    if (typeof window !== 'undefined') localStorage.setItem(PLAYLIST_KEY, JSON.stringify({ tracks: playlist, ts: Date.now() }));
   }, [playlist]);
 
   // Индекс выбранного трека
@@ -224,12 +232,32 @@ function App() {
     e.preventDefault();
     setLoading(true);
     setTracks([]);
+    setOffset(0);
+    setHasMore(false);
     try {
-      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(query)}&offset=0`);
       const data = await response.json();
       setTracks((data.data || []).map(track => ({ ...track })));
+      setHasMore((data.data || []).length === 20);
+      setOffset(20);
     } catch (err) {
       alert('Ошибка поиска треков!');
+    }
+    setLoading(false);
+  };
+
+  // Функция для подгрузки ещё треков
+  const loadMoreTracks = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(query)}&offset=${offset}`);
+      const data = await response.json();
+      const newTracks = (data.data || []).map(track => ({ ...track }));
+      setTracks(prev => [...prev, ...newTracks]);
+      setHasMore(newTracks.length === 20);
+      setOffset(prev => prev + 20);
+    } catch (err) {
+      alert('Ошибка загрузки треков!');
     }
     setLoading(false);
   };
@@ -272,20 +300,20 @@ function App() {
   return (
     <>
       <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
-    <div className="App">
+      <div className="App">
         <h1>Музыкальный Поиск</h1>
         <div className="search-form-wrapper">
           <form onSubmit={searchTracks} style={{ marginBottom: 0 }}>
-        <input
+            <input
               ref={inputRef}
-          type="text"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          placeholder="Поиск трека..."
-          style={{ padding: 8, width: 250 }}
-        />
-        <button type="submit" style={{ padding: 8, marginLeft: 8 }}>Поиск</button>
-      </form>
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Поиск трека..."
+              style={{ padding: 8, width: 250 }}
+            />
+            <button type="submit" style={{ padding: 8, marginLeft: 8 }}>Поиск</button>
+          </form>
         </div>
         {loading && (
           <div className="loader">
@@ -297,7 +325,7 @@ function App() {
         {!loading && tracks.length === 0 && (
           <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>Ничего не найдено</div>
         )}
-      <ul style={{ listStyle: 'none', padding: 0 }}>
+        <ul style={{ listStyle: 'none', padding: 0 }}>
           {tracks.map((track, idx) => (
             <li key={track.id} className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''} style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}>
               <img src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} style={{ width: 50, height: 50, borderRadius: 8, marginRight: 10 }} />
@@ -315,14 +343,19 @@ function App() {
                 <IconPlay />
               </button>
               <button className="playlist-btn" title="В плейлист" onClick={() => addToPlaylist(track)}><IconPlaylistAdd /></button>
-          </li>
-        ))}
-      </ul>
-      <div style={{ height: 90 }}></div>
-      {/* Мини-плеер */}
-      {selectedTrack && (
+            </li>
+          ))}
+        </ul>
+        {/* Кнопка "Ещё" теперь сразу после списка треков */}
+        {hasMore && !loading && (
+          <div style={{ textAlign: 'center', margin: '20px 0' }}>
+            <button onClick={loadMoreTracks} style={{ padding: 10, fontSize: 16 }}>Ещё</button>
+          </div>
+        )}
+        <div style={{ height: 90 }}></div>
+        {/* Мини-плеер */}
+        {selectedTrack && (
           <div className={`mini-player${isPlaying ? ' playing' : ''}${expanded ? ' expanded' : ''}`}>
-            
             <span className="mini-player-title">{selectedTrack.title}</span>
             <span className="mini-player-artist">{selectedTrack.user && selectedTrack.user.name}</span>
             <div className="mini-player-controls">
@@ -363,35 +396,35 @@ function App() {
                 <div>Альбом: {selectedTrack.album && selectedTrack.album.title ? selectedTrack.album.title : '—'}</div>
                 <div>Длительность: {formatTime(selectedTrack.duration)}</div>
                 <div>Артист: {selectedTrack.user && selectedTrack.user.name ? selectedTrack.user.name : '—'}</div>
-  </div>
-)}
-        </div>
-      )}
-      {/* Плейлист */}
-      {playlist.length > 0 && (
-        <div className="playlist-section">
-          <div className="playlist-title">Плейлист
-            <button className="playlist-clear-btn" title="Очистить плейлист" onClick={clearPlaylist}><IconDelete color="#ff5500" /></button>
+              </div>
+            )}
           </div>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {playlist.map((track, idx) => (
-              <li key={track.id} className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''} style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}>
-                <img src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} style={{ width: 40, height: 40, borderRadius: 8, marginRight: 10 }} />
-                <span style={{ flex: 1 }}>
-                  <b>{track.title}</b> <br />
-                  <span style={{ color: '#aaa' }}>{track.user && track.user.name}</span>
-                </span>
-                <button className="track-play-btn" onClick={() => playFromPlaylist(idx)}><IconPlay /></button>
-                <button className="playlist-btn" title="Удалить из плейлиста" onClick={() => removeFromPlaylist(track.id)}><IconDelete /></button>
-              </li>
-            ))}
-          </ul>
-          <div style={{ height: 90 }}></div>
-        </div>
-      )}
-    </div>
+        )}
+        {/* Плейлист */}
+        {playlist.length > 0 && (
+          <div className="playlist-section">
+            <div className="playlist-title">Плейлист
+              <button className="playlist-clear-btn" title="Очистить плейлист" onClick={clearPlaylist}><IconDelete color="#ff5500" /></button>
+            </div>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+              {playlist.map((track, idx) => (
+                <li key={track.id} className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''} style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}>
+                  <img src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} style={{ width: 40, height: 40, borderRadius: 8, marginRight: 10 }} />
+                  <span style={{ flex: 1 }}>
+                    <b>{track.title}</b> <br />
+                    <span style={{ color: '#aaa' }}>{track.user && track.user.name}</span>
+                  </span>
+                  <button className="track-play-btn" onClick={() => playFromPlaylist(idx)}><IconPlay /></button>
+                  <button className="playlist-btn" title="Удалить из плейлиста" onClick={() => removeFromPlaylist(track.id)}><IconDelete /></button>
+                </li>
+              ))}
+            </ul>
+            <div style={{ height: 90 }}></div>
+          </div>
+        )}
+      </div>
     </>
   );
 }
 
-export default App;
+export default Page; 
