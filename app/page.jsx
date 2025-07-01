@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 'use client';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import './App.css';
 
 function formatTime(sec) {
@@ -82,6 +81,9 @@ const IconPlaylistAdd = ({color = 'currentColor'}) => (
 const IconDelete = ({color = 'currentColor'}) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12ZM19 7V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v2m5 4v6m4-6v6" stroke={color} strokeWidth="2" strokeLinecap="round"/></svg>
 );
+const IconMinimize = ({color = '#ff5500'}) => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="11" width="14" height="2" rx="1" fill={color}/></svg>
+);
 
 function Page() {
   const [query, setQuery] = useState('');
@@ -101,6 +103,8 @@ function Page() {
   const [playingFromPlaylist, setPlayingFromPlaylist] = useState(false);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [showPlaylist, setShowPlaylist] = useState(false);
+  const [showPlayerPopup, setShowPlayerPopup] = useState(false);
 
   // Инициализация query и playlist из localStorage только на клиенте
   useEffect(() => {
@@ -152,13 +156,13 @@ function Page() {
 
   // Следующий трек (с учётом очереди)
   const playNext = () => {
-    if (!playingFromPlaylist && queue.length > 0) {
-      setSelectedTrack(queue[0]);
-      setQueue(q => q.slice(1));
+    if (selectedIndex >= 0 && selectedIndex < currentList.length - 1) {
+      setSelectedTrack(currentList[selectedIndex + 1]);
       setIsPlaying(true);
       setExpanded(false);
     } else {
-      playTrackAt(selectedIndex + 1);
+      // если последний трек — останавливаем
+      setIsPlaying(false);
     }
   };
   // Предыдущий трек
@@ -220,12 +224,13 @@ function Page() {
     }
   }, [selectedTrack, isPlaying]);
 
-  // Сбросить плеер полностью
+  // Сбросить плеер полностью (останавливаем музыку)
   const closePlayer = () => {
     setSelectedTrack(null);
     setIsPlaying(false);
     setExpanded(false);
     setQueue([]);
+    setShowPlayerPopup(false);
   };
 
   const searchTracks = async (e) => {
@@ -302,11 +307,28 @@ function Page() {
     checkSelectedTrackSource();
   }, [checkSelectedTrackSource]);
 
+  // Открыть попап-плеер
+  const openPlayerPopup = () => setShowPlayerPopup(true);
+  const closePlayerPopup = () => setShowPlayerPopup(false); // просто скрываем попап, не останавливаем музыку
+
   return (
     <>
       <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
+      {/* Глобальный аудиоплеер, всегда в DOM при выбранном треке */}
+      {selectedTrack && (
+        <audio
+          ref={audioRef}
+          src={`/api/audius/stream/${selectedTrack.id}`}
+          autoPlay={isPlaying}
+          onEnded={playNext}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          style={{ display: 'none' }}
+          controls={false}
+        />
+      )}
       <div className="App">
-        <h1>Музыкальный Поиск</h1>
+        <h1><span style={{ color: '#ff5500' }}>FREE</span>ZBY</h1>
         <div className="search-form-wrapper">
           <form onSubmit={searchTracks} style={{ marginBottom: 0 }}>
             <input
@@ -333,21 +355,23 @@ function Page() {
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {tracks.map((track, idx) => (
             <li key={track.id} className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''} style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}>
-              <Image src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} width={50} height={50} style={{ borderRadius: 8, marginRight: 10 }} />
-              <span style={{ flex: 1 }}>
-                <b>{track.title}</b> <br />
-                <span style={{ color: '#aaa' }}>{track.user && track.user.name}</span>
-                {track.duration ? (
-                  <span style={{ color: '#666', marginLeft: 8, fontSize: '0.95em' }}>{formatTime(track.duration)}</span>
-                ) : null}
-                {track.album && track.album.title && (
-                  <span style={{ color: '#ff5500', marginLeft: 8, fontSize: '0.95em' }}>{track.album.title}</span>
-                )}
-              </span>
-              <button className="track-play-btn" style={{ marginLeft: 10 }} onClick={() => { playFromSearch(idx); }}>
-                <IconPlay />
-              </button>
-              <button className="playlist-btn" title="В плейлист" onClick={() => addToPlaylist(track)}><IconPlaylistAdd /></button>
+              <img src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} width={50} height={50} style={{ borderRadius: 8, marginRight: 10, objectFit: 'cover' }} />
+              <div className="track-card-content">
+                <div className="track-card-title">{track.title}</div>
+                <div className="track-card-meta">
+                  {track.user && track.user.name}
+                  {track.duration ? (
+                    <span style={{ color: '#666', marginLeft: 8 }}>{formatTime(track.duration)}</span>
+                  ) : null}
+                  {track.album && track.album.title && (
+                    <span style={{ color: '#ff5500', marginLeft: 8 }}>{track.album.title}</span>
+                  )}
+                </div>
+              </div>
+              <div className="track-card-buttons">
+                <button className="track-play-btn" onClick={() => { playFromSearch(idx); openPlayerPopup(); }}><IconPlay /></button>
+                <button className="playlist-btn" title="В плейлист" onClick={() => addToPlaylist(track)}><IconPlaylistAdd /></button>
+              </div>
             </li>
           ))}
         </ul>
@@ -358,76 +382,63 @@ function Page() {
           </div>
         )}
         <div style={{ height: 90 }}></div>
-        {/* Мини-плеер */}
-        {selectedTrack && (
-          <div className={`mini-player${isPlaying ? ' playing' : ''}${expanded ? ' expanded' : ''}`}>
-            <span className="mini-player-title">{selectedTrack.title}</span>
-            <span className="mini-player-artist">{selectedTrack.user && selectedTrack.user.name}</span>
-            <div className="mini-player-controls">
-              <button onClick={playPrev} disabled={selectedIndex <= 0} title="Предыдущий">
-                <IconPrev color={selectedIndex <= 0 ? '#aaa' : '#ff5500'} />
-              </button>
-              <button onClick={handlePlayPause} title={isPlaying ? 'Пауза' : 'Воспроизвести'}>
-                {isPlaying ? <IconPause /> : <IconPlay />}
-              </button>
-              <button
-                onClick={playNext}
-                disabled={selectedIndex === -1 || selectedIndex >= currentList.length - 1}
-                title="Следующий"
-              >
-                <IconNext color={selectedIndex === -1 || selectedIndex >= currentList.length - 1 ? '#aaa' : '#ff5500'} />
-              </button>
-              <button className="mini-expand" onClick={() => setExpanded(e => !e)} title={expanded ? 'Свернуть' : 'Развернуть'}>{expanded ? <IconCollapse /> : <IconExpand />}</button>
-              <button className="mini-close" onClick={closePlayer} title="Закрыть"><IconClose /></button>
+        {/* Кнопка для открытия плейлиста */}
+        {playlist.length > 0 && (
+          <button style={{ position: 'fixed', bottom: 100, right: 24, zIndex: 1200, background: '#232323', color: '#ff5500', borderRadius: 24, padding: '12px 20px', fontSize: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }} onClick={() => setShowPlaylist(true)}>
+            Открыть плейлист
+          </button>
+        )}
+      </div>
+      {/* Попап-плеер */}
+      {showPlayerPopup && selectedTrack && (
+        <div className="player-popup" onClick={closePlayerPopup}>
+          <div className="player-popup-content" onClick={e => e.stopPropagation()}>
+            <button className="player-popup-close" onClick={closePlayerPopup}><IconClose /></button>
+            <img src={selectedTrack.artwork && selectedTrack.artwork['150x150'] ? selectedTrack.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={selectedTrack.title} width={180} height={180} style={{ borderRadius: 14, marginBottom: 18, objectFit: 'cover' }} />
+            <h2>{selectedTrack.title}</h2>
+            <div className="artist">{selectedTrack.user && selectedTrack.user.name}</div>
+            <div className="player-popup-progress" onClick={handleSeek} title="Перемотать">
+              <div className="player-popup-progress-inner" style={{ width: duration ? `${(progress/duration)*100}%` : '0%' }}></div>
             </div>
-            <audio
-              ref={audioRef}
-              src={`/api/audius/stream/${selectedTrack.id}`}
-              style={{ display: 'none' }}
-              autoPlay={isPlaying}
-              onEnded={playNext}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-            />
-            <div className="mini-player-progress" onClick={handleSeek} title="Перемотать">
-              <div className="mini-player-progress-inner" style={{ width: duration ? `${(progress/duration)*100}%` : '0%' }}></div>
-            </div>
-            <div className="mini-player-time">
+            <div className="player-popup-time">
               <span>{formatTime(progress)}</span>
               <span>{formatTime(duration)}</span>
             </div>
-            {expanded && (
-              <div className="mini-player-extra-info">
-                <div>Альбом: {selectedTrack.album && selectedTrack.album.title ? selectedTrack.album.title : '—'}</div>
-                <div>Длительность: {formatTime(selectedTrack.duration)}</div>
-                <div>Артист: {selectedTrack.user && selectedTrack.user.name ? selectedTrack.user.name : '—'}</div>
-              </div>
-            )}
+            <div className="player-popup-controls">
+              <button className="player-btn" onClick={playPrev} disabled={selectedIndex <= 0} title="Предыдущий"><IconPrev /></button>
+              <button className="player-btn player-btn--main" onClick={handlePlayPause} title={isPlaying ? 'Пауза' : 'Воспроизвести'}>{isPlaying ? <IconPause /> : <IconPlay />}</button>
+              <button className="player-btn" onClick={playNext} disabled={selectedIndex === -1 || selectedIndex >= currentList.length - 1} title="Следующий"><IconNext /></button>
+            </div>
           </div>
-        )}
-        {/* Плейлист */}
-        {playlist.length > 0 && (
-          <div className="playlist-section">
-            <div className="playlist-title">Плейлист
-              <button className="playlist-clear-btn" title="Очистить плейлист" onClick={clearPlaylist}><IconDelete color="#ff5500" /></button>
+        </div>
+      )}
+      {/* Плейлист в отдельном окне */}
+      {showPlaylist && playlist.length > 0 && (
+        <div className="playlist-popup" onClick={() => setShowPlaylist(false)}>
+          <div className="playlist-popup-content" onClick={e => e.stopPropagation()}>
+            <div className="playlist-title">
+              Плейлист
+              <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                <button className="playlist-clear-btn" onClick={() => setShowPlaylist(false)} title="Свернуть плейлист"><IconMinimize /></button>
+                <button className="playlist-clear-btn" title="Очистить плейлист" onClick={e => { e.stopPropagation(); clearPlaylist(); }}><IconDelete color="#ff5500" /></button>
+              </span>
             </div>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
               {playlist.map((track, idx) => (
                 <li key={track.id} className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''} style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}>
-                  <Image src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} width={40} height={40} style={{ borderRadius: 8, marginRight: 10 }} />
+                  <img src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} width={40} height={40} style={{ borderRadius: 8, marginRight: 10, objectFit: 'cover' }} />
                   <span style={{ flex: 1 }}>
                     <b>{track.title}</b> <br />
                     <span style={{ color: '#aaa' }}>{track.user && track.user.name}</span>
                   </span>
-                  <button className="track-play-btn" onClick={() => playFromPlaylist(idx)}><IconPlay /></button>
-                  <button className="playlist-btn" title="Удалить из плейлиста" onClick={() => removeFromPlaylist(track.id)}><IconDelete /></button>
+                  <button className="track-play-btn" onClick={() => { playFromPlaylist(idx); openPlayerPopup(); }}><IconPlay /></button>
+                  <button className="playlist-btn" title="Удалить из плейлиста" onClick={e => { e.stopPropagation(); removeFromPlaylist(track.id); }}><IconDelete /></button>
                 </li>
               ))}
             </ul>
-            <div style={{ height: 90 }}></div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }
