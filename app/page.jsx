@@ -2,6 +2,10 @@
 'use client';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
+import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 function formatTime(sec) {
   if (!isFinite(sec)) return '0:00';
@@ -85,6 +89,39 @@ const IconMinimize = ({color = '#ff5500'}) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="11" width="14" height="2" rx="1" fill={color}/></svg>
 );
 
+// Компонент для сортируемого трека
+function SortableTrack({ track, idx, selectedTrack, playFromPlaylist, openPlayerPopup, removeFromPlaylist, isDragging }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging: isDraggingItem } = useSortable({ id: track.id });
+  return (
+    <li
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''}
+      style={{
+        marginBottom: 10,
+        display: 'flex',
+        alignItems: 'center',
+        background: isDraggingItem ? '#333' : '#292929',
+        borderRadius: 8,
+        padding: '10px 16px',
+        boxShadow: isDraggingItem ? '0 4px 16px #0006' : undefined,
+        cursor: isDraggingItem ? 'grabbing' : 'grab',
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+    >
+      <img src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} width={40} height={40} style={{ borderRadius: 8, marginRight: 10, objectFit: 'cover' }} />
+      <span style={{ flex: 1 }}>
+        <b>{track.title}</b> <br />
+        <span style={{ color: '#aaa' }}>{track.user && track.user.name}</span>
+      </span>
+      <button className="track-play-btn" onClick={() => { playFromPlaylist(idx); openPlayerPopup(); }}><IconPlay /></button>
+      <button className="playlist-btn" title="Удалить из плейлиста" onClick={e => { e.stopPropagation(); removeFromPlaylist(track.id); }} disabled={isDragging}><IconDelete /></button>
+    </li>
+  );
+}
+
 function Page() {
   const [query, setQuery] = useState('');
   const [tracks, setTracks] = useState([]);
@@ -105,6 +142,7 @@ function Page() {
   const [hasMore, setHasMore] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [showPlayerPopup, setShowPlayerPopup] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Инициализация query и playlist из localStorage только на клиенте
   useEffect(() => {
@@ -134,8 +172,14 @@ function Page() {
 
   // Сохранять плейлист
   useEffect(() => {
+    if (isDragging) return; // Не синхронизируем во время drag
     if (typeof window !== 'undefined') localStorage.setItem(PLAYLIST_KEY, JSON.stringify({ tracks: playlist, ts: Date.now() }));
-  }, [playlist]);
+  }, [playlist, isDragging]);
+
+  // Логирование изменений playlist и isDragging
+  useEffect(() => {
+    console.log('playlist changed', playlist.map(t => t.id), 'isDragging:', isDragging);
+  }, [playlist, isDragging]);
 
   // Индекс выбранного трека
   const selectedIndex = selectedTrack
@@ -311,6 +355,15 @@ function Page() {
   const openPlayerPopup = () => setShowPlayerPopup(true);
   const closePlayerPopup = () => setShowPlayerPopup(false); // просто скрываем попап, не останавливаем музыку
 
+  // sensors для dnd-kit с поддержкой мобильных
+  const isMobile = typeof window !== 'undefined' && (
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  );
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } })
+  );
+
   return (
     <>
       <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
@@ -415,27 +468,45 @@ function Page() {
       {/* Плейлист в отдельном окне */}
       {showPlaylist && playlist.length > 0 && (
         <div className="playlist-popup" onClick={() => setShowPlaylist(false)}>
-          <div className="playlist-popup-content" onClick={e => e.stopPropagation()}>
-            <div className="playlist-title">
-              Плейлист
-              <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                <button className="playlist-clear-btn" onClick={() => setShowPlaylist(false)} title="Свернуть плейлист"><IconMinimize /></button>
-                <button className="playlist-clear-btn" title="Очистить плейлист" onClick={e => { e.stopPropagation(); clearPlaylist(); }}><IconDelete color="#ff5500" /></button>
-              </span>
+          <div className="playlist-title playlist-title-sticky">
+            <span className="playlist-title-text">Плейлист</span>
+            <div className="playlist-title-actions">
+              <button className="playlist-clear-btn" onClick={() => setShowPlaylist(false)} title="Свернуть плейлист" disabled={isDragging}><IconMinimize /></button>
+              <button className="playlist-clear-btn" title="Очистить плейлист" onClick={e => { e.stopPropagation(); clearPlaylist(); }} disabled={isDragging}><IconDelete color="#ff5500" /></button>
             </div>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {playlist.map((track, idx) => (
-                <li key={track.id} className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''} style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}>
-                  <img src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} width={40} height={40} style={{ borderRadius: 8, marginRight: 10, objectFit: 'cover' }} />
-                  <span style={{ flex: 1 }}>
-                    <b>{track.title}</b> <br />
-                    <span style={{ color: '#aaa' }}>{track.user && track.user.name}</span>
-                  </span>
-                  <button className="track-play-btn" onClick={() => { playFromPlaylist(idx); openPlayerPopup(); }}><IconPlay /></button>
-                  <button className="playlist-btn" title="Удалить из плейлиста" onClick={e => { e.stopPropagation(); removeFromPlaylist(track.id); }}><IconDelete /></button>
-                </li>
-              ))}
-            </ul>
+          </div>
+          <div className="playlist-scrollable" onClick={e => e.stopPropagation()} style={{ overflowY: 'auto', maxHeight: '60vh', margin: 0, padding: 0 }}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={() => setIsDragging(true)}
+              onDragEnd={({ active, over }) => {
+                setIsDragging(false);
+                if (active.id !== over?.id) {
+                  const oldIndex = playlist.findIndex(t => t.id === active.id);
+                  const newIndex = playlist.findIndex(t => t.id === over.id);
+                  setPlaylist(arrayMove(playlist, oldIndex, newIndex));
+                }
+              }}
+              onDragCancel={() => setIsDragging(false)}
+            >
+              <SortableContext items={playlist.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {playlist.map((track, idx) => (
+                    <SortableTrack
+                      key={track.id}
+                      track={track}
+                      idx={idx}
+                      selectedTrack={selectedTrack}
+                      playFromPlaylist={playFromPlaylist}
+                      openPlayerPopup={openPlayerPopup}
+                      removeFromPlaylist={removeFromPlaylist}
+                      isDragging={isDragging}
+                    />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           </div>
         </div>
       )}
