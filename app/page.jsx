@@ -2,7 +2,6 @@
 'use client';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './App.css';
-import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
