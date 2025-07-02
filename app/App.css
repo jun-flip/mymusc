@@ -779,7 +779,6 @@ iframe {
   background: #292929;
   border-radius: 8px;
   padding: 10px 16px;
-  touch-action: none;
   -webkit-user-select: none;
   user-select: none;
 }

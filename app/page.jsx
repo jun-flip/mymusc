@@ -257,16 +257,6 @@ function Page() {
     audioRef.current.currentTime = percent * duration;
   };
 
-  // Автоматически запускать play() при смене трека
-  useEffect(() => {
-    if (selectedTrack && audioRef.current) {
-      audioRef.current.load();
-      if (isPlaying) {
-        audioRef.current.play().catch(() => {});
-      }
-    }
-  }, [selectedTrack, isPlaying]);
-
   // Сбросить плеер полностью (останавливаем музыку)
   const closePlayer = () => {
     setSelectedTrack(null);
@@ -375,6 +365,11 @@ function Page() {
           onEnded={playNext}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
+          onLoadedData={() => {
+            if (isPlaying && audioRef.current) {
+              audioRef.current.play().catch(() => {});
+            }
+          }}
           style={{ display: 'none' }}
           controls={false}
         />
@@ -471,7 +466,6 @@ function Page() {
             <span className="playlist-title-text">Плейлист</span>
             <div className="playlist-title-actions">
               <button className="playlist-clear-btn" onClick={() => setShowPlaylist(false)} title="Свернуть плейлист" disabled={isDragging}><IconMinimize /></button>
-              <button className="playlist-clear-btn" title="Очистить плейлист" onClick={e => { e.stopPropagation(); clearPlaylist(); }} disabled={isDragging}><IconDelete color="#ff5500" /></button>
             </div>
           </div>
           <div className="playlist-scrollable" onClick={e => e.stopPropagation()} style={{ overflowY: 'auto', maxHeight: '60vh', margin: 0, padding: 0 }}>
@@ -506,6 +500,17 @@ function Page() {
                 </ul>
               </SortableContext>
             </DndContext>
+            {/* Кнопка очистки плейлиста внизу */}
+            <div style={{ display: 'flex', justifyContent: 'center', margin: '18px 0 6px 0' }}>
+              <button
+                className="playlist-clear-btn-text"
+                onClick={e => { e.stopPropagation(); clearPlaylist(); }}
+                disabled={isDragging}
+                style={{ color: '#ff5500', background: 'none', border: 'none', fontSize: '1.08rem', cursor: 'pointer', padding: '8px 18px', borderRadius: 8 }}
+              >
+                Очистить плейлист
+              </button>
+            </div>
           </div>
         </div>
       )}
