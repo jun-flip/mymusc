@@ -1,60 +1,24 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 'use client';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import './App.css';
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import Player from './components/Player';
+import Playlist from './components/Playlist';
+import PseudoRandomEQ from './components/PseudoRandomEQ';
+import TrackCard from './components/TrackCard';
+import SearchForm from './components/SearchForm';
+import BurgerMenu from './components/BurgerMenu';
+import MiniPlayer from './components/MiniPlayer.js';
 
 function formatTime(sec) {
   if (!isFinite(sec)) return '0:00';
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m}:${s < 10 ? '0' : ''}${s}`;
-}
-
-function PseudoRandomEQ({ isPlaying, barCount = 96 }) {
-  const [heights, setHeights] = useState(() => Array(barCount).fill(18));
-  const rafRef = useRef();
-
-  useEffect(() => {
-    if (!isPlaying) {
-      setHeights(Array(barCount).fill(18));
-      return;
-    }
-    let running = true;
-    const animate = () => {
-      if (!running) return;
-      setHeights(prev => prev.map((h, i) => {
-        const t = Date.now() / 700 + i * 0.15;
-        const base = 18 + 62 * (0.5 + 0.5 * Math.sin(t + Math.sin(i)));
-        const noise = 8 * Math.sin(t * (i % 7 + 1));
-        return Math.max(12, Math.min(100, base + noise));
-      }));
-      rafRef.current = requestAnimationFrame(animate);
-    };
-    rafRef.current = requestAnimationFrame(animate);
-    return () => {
-      running = false;
-      cancelAnimationFrame(rafRef.current);
-    };
-  }, [isPlaying, barCount]);
-
-  return (
-    <div className="background-eq" aria-hidden>
-      {heights.map((h, i) => (
-        <div
-          key={i}
-          className="background-eq-bar"
-          style={{
-            height: `${h}%`,
-            animation: 'none',
-            animationPlayState: 'paused',
-          }}
-        ></div>
-      ))}
-    </div>
-  );
 }
 
 const IconPrev = ({color = '#ff5500'}) => (
@@ -86,6 +50,12 @@ const IconDelete = ({color = 'currentColor'}) => (
 );
 const IconMinimize = ({color = '#ff5500'}) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="11" width="14" height="2" rx="1" fill={color}/></svg>
+);
+const IconChevronDown = ({color = '#ff5500'}) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+);
+const IconChevronUp = ({color = '#ff5500'}) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 15l-6-6-6 6" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
 );
 
 // Компонент для сортируемого трека
@@ -121,6 +91,75 @@ function SortableTrack({ track, idx, selectedTrack, playFromPlaylist, openPlayer
   );
 }
 
+// Вспомогательная функция для извлечения числового id из permalink
+function extractTrackNumericId(permalink) {
+  if (!permalink) return null;
+  const match = permalink.match(/-(\d+)$/);
+  return match ? match[1] : null;
+}
+
+function ErrorBoundary({ children }) {
+  const [error, setError] = useState(null);
+  if (error) {
+    return <div style={{ color: '#ff5500', padding: 32, textAlign: 'center', fontSize: 20 }}>Что-то пошло не так: {error.message || error.toString()}</div>;
+  }
+  return (
+    <React.Suspense fallback={<div style={{ color: '#ff5500', padding: 32, textAlign: 'center', fontSize: 20 }}>Загрузка...</div>}>
+      {React.Children.map(children, child =>
+        React.isValidElement(child)
+          ? React.cloneElement(child, { onError: setError })
+          : child
+      )}
+    </React.Suspense>
+  );
+}
+
+const translations = {
+  ru: {
+    searchPlaceholder: 'Поиск трека...',
+    searchButton: 'Поиск',
+    nothingFound: 'Ничего не найдено',
+    openPlaylist: 'Открыть плейлист',
+    play: 'Воспроизвести',
+    addToPlaylist: 'В плейлист',
+    next: 'Следующий',
+    prev: 'Предыдущий',
+    buffering: 'Буферизация...',
+    lightTheme: 'Светлая тема',
+    darkTheme: 'Тёмная тема',
+    switchTheme: 'Переключить тему',
+    switchLang: 'Switch to English',
+  },
+  en: {
+    searchPlaceholder: 'Search track...',
+    searchButton: 'Search',
+    nothingFound: 'Nothing found',
+    openPlaylist: 'Open playlist',
+    play: 'Play',
+    addToPlaylist: 'Add to playlist',
+    next: 'Next',
+    prev: 'Previous',
+    buffering: 'Buffering...',
+    lightTheme: 'Light theme',
+    darkTheme: 'Dark theme',
+    switchTheme: 'Switch theme',
+    switchLang: 'Переключить на русский',
+  },
+};
+
+// Хук для медиа-запроса
+function useMediaQuery(query) {
+  const [matches, setMatches] = React.useState(false);
+  React.useEffect(() => {
+    const media = window.matchMedia(query);
+    if (media.matches !== matches) setMatches(media.matches);
+    const listener = () => setMatches(media.matches);
+    media.addEventListener('change', listener);
+    return () => media.removeEventListener('change', listener);
+  }, [matches, query]);
+  return matches;
+}
+
 function Page() {
   const [query, setQuery] = useState('');
   const [tracks, setTracks] = useState([]);
@@ -142,6 +181,18 @@ function Page() {
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [showPlayerPopup, setShowPlayerPopup] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [buffered, setBuffered] = useState([]); // массив диапазонов буфера
+  const [isBuffering, setIsBuffering] = useState(false); // индикатор буферизации
+  const [tab, setTab] = useState('search');
+  const [theme, setTheme] = useState('dark');
+  const [lang, setLang] = useState('ru');
+  const [playlistCollapsed, setPlaylistCollapsed] = useState(false);
+  const [burgerOpen, setBurgerOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+  const isNarrow = useMediaQuery('(max-width: 600px)');
+  const [shouldPlayOnTrackChange, setShouldPlayOnTrackChange] = useState(false);
+
+  useEffect(() => { setIsClient(true); }, []);
 
   // Инициализация query и playlist из localStorage только на клиенте
   useEffect(() => {
@@ -152,7 +203,11 @@ function Page() {
         if (raw) {
           const { tracks, ts } = JSON.parse(raw);
           if (Date.now() - ts <= PLAYLIST_TTL) {
-            setPlaylist(tracks || []);
+            // Добавляем streamId для каждого трека, если его нет
+            setPlaylist((tracks || []).map(track => ({
+              ...track,
+              streamId: track.streamId || extractTrackNumericId(track.permalink),
+            })));
           } else {
             localStorage.removeItem(PLAYLIST_KEY);
           }
@@ -161,7 +216,7 @@ function Page() {
         // Ошибка при чтении из localStorage
       }
     }
-  }, [PLAYLIST_TTL]);
+  }, []);
 
   // Автофокус на поле поиска
   useEffect(() => { inputRef.current && inputRef.current.focus(); }, []);
@@ -192,7 +247,7 @@ function Page() {
   const playTrackAt = idx => {
     if (idx >= 0 && idx < currentList.length) {
       setSelectedTrack(currentList[idx]);
-      setIsPlaying(true);
+      setShouldPlayOnTrackChange(true);
       setExpanded(false);
     }
   };
@@ -201,10 +256,9 @@ function Page() {
   const playNext = () => {
     if (selectedIndex >= 0 && selectedIndex < currentList.length - 1) {
       setSelectedTrack(currentList[selectedIndex + 1]);
-      setIsPlaying(true);
+      setShouldPlayOnTrackChange(true);
       setExpanded(false);
     } else {
-      // если последний трек — останавливаем
       setIsPlaying(false);
     }
   };
@@ -218,7 +272,7 @@ function Page() {
 
   // Добавить в плейлист
   const addToPlaylist = track => {
-    setPlaylist(pl => pl.find(t => t.id === track.id) ? pl : [...pl, track]);
+    setPlaylist(pl => pl.find(t => t.id === track.id) ? pl : [...pl, { ...track, streamId: track.streamId || extractTrackNumericId(track.permalink) }]);
   };
 
   // Воспроизведение/пауза
@@ -258,6 +312,7 @@ function Page() {
   };
 
   // Сбросить плеер полностью (останавливаем музыку)
+  // Оставляем closePlayer только для явного закрытия, не вызываем при смене tab
   const closePlayer = () => {
     setSelectedTrack(null);
     setIsPlaying(false);
@@ -273,11 +328,18 @@ function Page() {
     setOffset(0);
     setHasMore(false);
     try {
-      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(query)}&offset=0`);
+      const cleanQuery = query.replace(/#/g, '');
+      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(cleanQuery)}&offset=0`);
       const data = await response.json();
-      setTracks((data.data || []).map(track => ({ ...track })));
-      setHasMore((data.data || []).length === 20);
+      const newTracks = (data.data || []).map(track => ({
+        ...track,
+        streamId: extractTrackNumericId(track.permalink),
+      }));
+      setTracks(newTracks);
+      setHasMore(newTracks.length === 20);
       setOffset(20);
+      // Если playing трек был из поиска, но его больше нет — сохраняем selectedTrack и isPlaying
+      // (ничего не сбрасываем)
     } catch {
       alert('Ошибка поиска треков!');
     }
@@ -288,9 +350,13 @@ function Page() {
   const loadMoreTracks = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(query)}&offset=${offset}`);
+      const cleanQuery = query.replace(/#/g, '');
+      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(cleanQuery)}&offset=${offset}`);
       const data = await response.json();
-      const newTracks = (data.data || []).map(track => ({ ...track }));
+      const newTracks = (data.data || []).map(track => ({
+        ...track,
+        streamId: extractTrackNumericId(track.permalink),
+      }));
       setTracks(prev => [...prev, ...newTracks]);
       setHasMore(newTracks.length === 20);
       setOffset(prev => prev + 20);
@@ -310,8 +376,12 @@ function Page() {
 
   // Воспроизвести из плейлиста
   const playFromPlaylist = idx => {
+    if (selectedTrack && playlist[idx] && selectedTrack.id === playlist[idx].id) {
+      // Уже выбран этот трек — не перезапускать
+      return;
+    }
     setSelectedTrack(playlist[idx]);
-    setIsPlaying(true);
+    setShouldPlayOnTrackChange(true);
     setExpanded(false);
     setPlayingFromPlaylist(true);
   };
@@ -319,26 +389,10 @@ function Page() {
   // Воспроизвести из поиска
   const playFromSearch = idx => {
     setSelectedTrack(tracks[idx]);
-    setIsPlaying(true);
+    setShouldPlayOnTrackChange(true);
     setExpanded(false);
     setPlayingFromPlaylist(false);
   };
-
-  const checkSelectedTrackSource = useCallback(() => {
-    if (!selectedTrack) return;
-    const inPlaylist = playlist.find(t => t.id === selectedTrack.id);
-    const inTracks = tracks.find(t => t.id === selectedTrack.id);
-    if (playingFromPlaylist && !inPlaylist) {
-      setPlayingFromPlaylist(false);
-      return;
-    }
-    if (!playingFromPlaylist && !inTracks) {
-      setPlayingFromPlaylist(true);
-    }
-  }, [selectedTrack, playlist, tracks, playingFromPlaylist]);
-  useEffect(() => {
-    checkSelectedTrackSource();
-  }, [checkSelectedTrackSource]);
 
   // Открыть попап-плеер
   const openPlayerPopup = () => setShowPlayerPopup(true);
@@ -353,168 +407,233 @@ function Page() {
     useSensor(TouchSensor, { activationConstraint: { delay: 300, tolerance: 8 } })
   );
 
+  // Обновление буфера
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const updateBuffered = () => {
+      const buf = [];
+      for (let i = 0; i < audio.buffered.length; i++) {
+        buf.push({
+          start: audio.buffered.start(i),
+          end: audio.buffered.end(i),
+        });
+      }
+      setBuffered(buf);
+    };
+    audio.addEventListener('progress', updateBuffered);
+    updateBuffered();
+    return () => {
+      audio.removeEventListener('progress', updateBuffered);
+    };
+  }, [selectedTrack]);
+
+  // События буферизации
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const handleWaiting = () => setIsBuffering(true);
+    const handleCanPlay = () => setIsBuffering(false);
+    audio.addEventListener('waiting', handleWaiting);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('canplaythrough', handleCanPlay);
+    return () => {
+      audio.removeEventListener('waiting', handleWaiting);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('canplaythrough', handleCanPlay);
+    };
+  }, [selectedTrack]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTab = localStorage.getItem('tab');
+      if (savedTab) setTab(savedTab);
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme) setTheme(savedTheme);
+      const savedLang = localStorage.getItem('lang');
+      if (savedLang) setLang(savedLang);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('tab', tab);
+    }
+    // Не сбрасываем selectedTrack и isPlaying при смене tab
+  }, [tab]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      document.body.classList.toggle('theme-light', theme === 'light');
+      document.body.classList.toggle('theme-dark', theme === 'dark');
+      localStorage.setItem('theme', theme);
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('lang', lang);
+    }
+  }, [lang]);
+
+  // useEffect для устойчивого старта воспроизведения после смены трека
+  useEffect(() => {
+    if (!selectedTrack || !shouldPlayOnTrackChange) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    const tryPlay = () => {
+      audio.play().catch(() => {});
+      setIsPlaying(true);
+      setShouldPlayOnTrackChange(false);
+    };
+    if (audio.readyState >= 3) {
+      tryPlay();
+    } else {
+      audio.addEventListener('canplay', tryPlay, { once: true });
+      return () => {
+        audio.removeEventListener('canplay', tryPlay);
+      };
+    }
+  }, [selectedTrack, shouldPlayOnTrackChange]);
+
+  const t = translations[lang];
+
   return (
-    <>
+    <ErrorBoundary>
+      <BurgerMenu tab={tab} setTab={setTab} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} t={t} />
       <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
-      {/* Глобальный аудиоплеер, всегда в DOM при выбранном треке */}
-      {selectedTrack && (
+      {selectedTrack && selectedTrack.streamId && (
         <audio
           ref={audioRef}
-          src={`/api/audius/stream/${selectedTrack.id}`}
+          src={`/api/audius/stream/${selectedTrack.streamId}`}
           autoPlay={isPlaying}
           onEnded={playNext}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
-          onLoadedData={() => {
-            if (isPlaying && audioRef.current) {
-              audioRef.current.play().catch(() => {});
-            }
-          }}
           style={{ display: 'none' }}
           controls={false}
         />
       )}
+      {tab === 'search' && (
       <div className="App">
         <h1><span style={{ color: '#ff5500' }}>FREE</span>ZBY</h1>
-        <div className="search-form-wrapper">
-          <form onSubmit={searchTracks} style={{ marginBottom: 0 }}>
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Поиск трека..."
-              style={{ padding: 8, width: 250 }}
-            />
-            <button type="submit" style={{ padding: 8, marginLeft: 8 }}>Поиск</button>
-          </form>
-        </div>
+          <SearchForm query={query} setQuery={setQuery} onSubmit={searchTracks} inputRef={inputRef} />
         {loading && (
-          <div className="loader">
+            <div className="loader" role="status" aria-live="polite">
             <span className="loader-dot"></span>
             <span className="loader-dot"></span>
             <span className="loader-dot"></span>
+              <span style={{ position: 'absolute', left: -9999 }} aria-live="polite">Загрузка...</span>
           </div>
         )}
         {!loading && tracks.length === 0 && (
-          <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>Ничего не найдено</div>
+            <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>{t.nothingFound}</div>
         )}
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {tracks.map((track, idx) => (
-            <li key={track.id} className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''} style={{ marginBottom: 10, display: 'flex', alignItems: 'center' }}>
-              <img src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} width={50} height={50} style={{ borderRadius: 8, marginRight: 10, objectFit: 'cover' }} />
-              <div className="track-card-content">
-                <div className="track-card-title">{track.title}</div>
-                <div className="track-card-meta">
-                  {track.user && track.user.name}
-                  {track.duration ? (
-                    <span style={{ color: '#666', marginLeft: 8 }}>{formatTime(track.duration)}</span>
-                  ) : null}
-                  {track.album && track.album.title && (
-                    <span style={{ color: '#ff5500', marginLeft: 8 }}>{track.album.title}</span>
-                  )}
-                </div>
-              </div>
-              <div className="track-card-buttons">
-                <button className="track-play-btn" onClick={() => { playFromSearch(idx); openPlayerPopup(); }}><IconPlay /></button>
-                <button className="playlist-btn" title="В плейлист" onClick={() => addToPlaylist(track)}><IconPlaylistAdd /></button>
-              </div>
-            </li>
+              <TrackCard
+                key={track.id}
+                track={track}
+                idx={idx}
+                selectedTrack={selectedTrack}
+                isPlaying={isPlaying}
+                progress={selectedTrack && track.id === selectedTrack.id ? progress : 0}
+                duration={selectedTrack && track.id === selectedTrack.id ? duration : 0}
+                playFromSearch={playFromSearch}
+                openPlayerPopup={openPlayerPopup}
+                addToPlaylist={addToPlaylist}
+                IconPlay={IconPlay}
+                IconPause={IconPause}
+                IconPlaylistAdd={IconPlaylistAdd}
+                aria-label={`Воспроизвести трек ${track.title}`}
+              />
           ))}
         </ul>
-        {/* Кнопка "Ещё" теперь сразу после списка треков */}
         {hasMore && !loading && (
           <div style={{ textAlign: 'center', margin: '20px 0' }}>
-            <button onClick={loadMoreTracks} style={{ padding: 10, fontSize: 16 }}>Ещё</button>
-          </div>
-        )}
-        <div style={{ height: 90 }}></div>
-        {/* Кнопка для открытия плейлиста */}
-        {playlist.length > 0 && (
-          <button style={{ position: 'fixed', bottom: 100, right: 24, zIndex: 1200, background: '#232323', color: '#ff5500', borderRadius: 24, padding: '12px 20px', fontSize: 18, boxShadow: '0 2px 8px rgba(0,0,0,0.18)' }} onClick={() => setShowPlaylist(true)}>
-            Открыть плейлист
-          </button>
-        )}
-      </div>
-      {/* Попап-плеер */}
-      {showPlayerPopup && selectedTrack && (
-        <div className="player-popup" onClick={closePlayerPopup}>
-          <div className="player-popup-content" onClick={e => e.stopPropagation()}>
-            <button className="player-popup-close" onClick={closePlayerPopup}><IconClose /></button>
-            <img src={selectedTrack.artwork && selectedTrack.artwork['150x150'] ? selectedTrack.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={selectedTrack.title} width={180} height={180} style={{ borderRadius: 14, marginBottom: 18, objectFit: 'cover' }} />
-            <h2>{selectedTrack.title}</h2>
-            <div className="artist">{selectedTrack.user && selectedTrack.user.name}</div>
-            <div className="player-popup-progress" onClick={handleSeek} title="Перемотать">
-              <div className="player-popup-progress-inner" style={{ width: duration ? `${(progress/duration)*100}%` : '0%' }}></div>
+              <button onClick={loadMoreTracks} style={{ padding: 10, fontSize: 16 }}>{t.next}</button>
             </div>
-            <div className="player-popup-time">
-              <span>{formatTime(progress)}</span>
-              <span>{formatTime(duration)}</span>
-            </div>
-            <div className="player-popup-controls">
-              <button className="player-btn" onClick={playPrev} disabled={selectedIndex <= 0} title="Предыдущий"><IconPrev /></button>
-              <button className="player-btn player-btn--main" onClick={handlePlayPause} title={isPlaying ? 'Пауза' : 'Воспроизвести'}>{isPlaying ? <IconPause /> : <IconPlay />}</button>
-              <button className="player-btn" onClick={playNext} disabled={selectedIndex === -1 || selectedIndex >= currentList.length - 1} title="Следующий"><IconNext /></button>
-            </div>
-          </div>
+          )}
         </div>
       )}
-      {/* Плейлист в отдельном окне */}
-      {showPlaylist && playlist.length > 0 && (
-        <div className="playlist-popup" onClick={() => setShowPlaylist(false)}>
-          <div className="playlist-title playlist-title-sticky">
-            <span className="playlist-title-text">Плейлист</span>
-            <div className="playlist-title-actions">
-              <button className="playlist-clear-btn" onClick={() => setShowPlaylist(false)} title="Свернуть плейлист" disabled={isDragging}><IconMinimize /></button>
-            </div>
+      {tab === 'player' && (
+        <div className="App app-player">
+          <div className="player-container">
+            {isNarrow ? (
+              <MiniPlayer
+                asPortal={false}
+                selectedTrack={selectedTrack}
+                isPlaying={isPlaying}
+                onPlayPause={handlePlayPause}
+                onNext={playNext}
+                onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
+                progress={progress}
+                duration={duration}
+                formatTime={formatTime}
+                IconPlay={IconPlay}
+                IconPause={IconPause}
+              />
+            ) : (
+              <Player
+                selectedTrack={selectedTrack}
+                isPlaying={isPlaying}
+                audioRef={audioRef}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={playNext}
+                playNext={playNext}
+                playPrev={playPrev}
+                progress={progress}
+                duration={duration}
+                buffered={buffered}
+                isBuffering={isBuffering}
+                handleSeek={handleSeek}
+                handlePlayPause={handlePlayPause}
+                formatTime={formatTime}
+                IconPrev={IconPrev}
+                IconNext={IconNext}
+                IconPlay={IconPlay}
+                IconPause={IconPause}
+              />
+            )}
           </div>
-          <div className="playlist-scrollable" onClick={e => e.stopPropagation()} style={{ overflowY: 'auto', maxHeight: '60vh', margin: 0, padding: 0 }}>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={() => setIsDragging(true)}
-              onDragEnd={({ active, over }) => {
-                setIsDragging(false);
-                if (active.id !== over?.id) {
-                  const oldIndex = playlist.findIndex(t => t.id === active.id);
-                  const newIndex = playlist.findIndex(t => t.id === over.id);
-                  setPlaylist(arrayMove(playlist, oldIndex, newIndex));
-                }
-              }}
-              onDragCancel={() => setIsDragging(false)}
-            >
-              <SortableContext items={playlist.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                  {playlist.map((track, idx) => (
-                    <SortableTrack
-                      key={track.id}
-                      track={track}
-                      idx={idx}
+          {playlist.length > 0 && (
+            <Playlist
+              playlist={playlist}
                       selectedTrack={selectedTrack}
                       playFromPlaylist={playFromPlaylist}
                       openPlayerPopup={openPlayerPopup}
                       removeFromPlaylist={removeFromPlaylist}
+              clearPlaylist={clearPlaylist}
                       isDragging={isDragging}
-                    />
-                  ))}
-                </ul>
-              </SortableContext>
-            </DndContext>
-            {/* Кнопка очистки плейлиста внизу */}
-            <div style={{ display: 'flex', justifyContent: 'center', margin: '18px 0 6px 0' }}>
-              <button
-                className="playlist-clear-btn-text"
-                onClick={e => { e.stopPropagation(); clearPlaylist(); }}
-                disabled={isDragging}
-                style={{ color: '#ff5500', background: 'none', border: 'none', fontSize: '1.08rem', cursor: 'pointer', padding: '8px 18px', borderRadius: 8 }}
-              >
-                Очистить плейлист
-              </button>
-            </div>
-          </div>
+              setIsDragging={setIsDragging}
+              sensors={sensors}
+              IconChevronDown={IconChevronDown}
+              IconChevronUp={IconChevronUp}
+              arrayMove={arrayMove}
+              playlistCollapsed={playlistCollapsed}
+              setPlaylistCollapsed={setPlaylistCollapsed}
+            />
+          )}
         </div>
       )}
-    </>
+      {/* Мини-плеер: показываем только если выбран трек и tab === 'search' */}
+      {tab === 'search' && selectedTrack && (
+        <MiniPlayer
+          asPortal={true}
+          selectedTrack={selectedTrack}
+          isPlaying={isPlaying}
+          onPlayPause={handlePlayPause}
+          onNext={playNext}
+          onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
+          progress={progress}
+          duration={duration}
+          formatTime={formatTime}
+          IconPlay={IconPlay}
+          IconPause={IconPause}
+        />
+      )}
+    </ErrorBoundary>
   );
 }
 

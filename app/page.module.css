@@ -166,3 +166,34 @@ a.secondary {
     filter: invert();
   }
 }
+
+:focus {
+  outline: 2px solid #ff5500 !important;
+  outline-offset: 2px;
+}
+
+button:focus, .track-play-btn:focus, .playlist-btn:focus, .player-btn:focus {
+  outline: 2px solid #ff5500 !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #ff5500;
+  z-index: 2;
+}
+
+.player-popup-close:focus {
+  outline: 2px solid #ff5500 !important;
+  outline-offset: 2px;
+}
+
+input:focus {
+  outline: 2px solid #ff5500 !important;
+  outline-offset: 2px;
+}
+
+.track-active {
+  background: #222 !important;
+  color: #fff !important;
+}
+
+button, .track-play-btn, .playlist-btn, .player-btn {
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}

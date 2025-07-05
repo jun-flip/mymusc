@@ -13,8 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FREEZBY",
-  description: "FREEZBY — музыкальный поиск и плеер",
+  title: "FREEZBY Player",
+  description: "Аудиоплеер с поддержкой плейлистов и поиска треков.",
+  themeColor: "#ff5500",
+  icons: [
+    { rel: 'icon', url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    { rel: 'apple-touch-icon', url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    { rel: 'manifest', url: '/manifest.json' },
+  ],
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
 };
 
 export default function RootLayout({
@@ -23,8 +30,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="ru">
+      <head>
+        <meta name="theme-color" content="#ff5500" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png" />
+        <link rel="apple-touch-icon" href="/icon-192.png" sizes="192x192" type="image/png" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="description" content="Аудиоплеер с поддержкой плейлиста и поиска треков." />
+        <meta property="og:title" content="FREEZBY Player" />
+        <meta property="og:description" content="Аудиоплеер с поддержкой плейлиста и поиска треков." />
+        <meta property="og:image" content="/icon-512.png" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="FREEZBY Player" />
+        <meta name="twitter:description" content="Аудиоплеер с поддержкой плейлиста и поиска треков." />
+        <meta name="twitter:image" content="/icon-512.png" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <div id="burger-root"></div>
         {children}
       </body>
     </html>
