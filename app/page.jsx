@@ -1062,7 +1062,9 @@ function Page() {
                   trackId: selectedTrack?.id,
                   streamId: selectedTrack?.streamId,
                   trackTitle: selectedTrack?.title,
-                  audioSrc: e?.target?.src
+                  audioSrc: e?.target?.src,
+                  readyState: e?.target?.readyState,
+                  networkState: e?.target?.networkState
                 });
                 
                 setIsPlaying(false);
@@ -1094,12 +1096,17 @@ function Page() {
                       errorMessage = `Ошибка воспроизведения (код: ${error.code}). Возможные причины:\n• Трек временно недоступен\n• Проблемы с Audius сервисом\n• Трек был удалён`;
                   }
                 } else {
-                  // Проверяем, не получили ли мы JSON с ошибкой вместо аудио
-                  const audioSrc = e?.target?.src;
-                  if (audioSrc && audioSrc.includes('/api/audius/stream')) {
-                    errorMessage = 'Audius сервис временно недоступен. Возможные причины:\n• Все провайдеры Audius заблокированы или недоступны\n• Проблемы с интернет-соединением\n• Трек удалён или недоступен на всех провайдерах';
+                  // Проверяем состояние сети и готовности
+                  const audio = e?.target;
+                  if (audio) {
+                    if (audio.networkState === 3) { // NETWORK_NO_SOURCE
+                      errorMessage = 'Источник аудио недоступен. Возможные причины:\n• Трек удалён или недоступен\n• Все провайдеры Audius заблокированы\n• Проблемы с интернет-соединением';
+                    } else if (audio.readyState === 0) { // HAVE_NOTHING
+                      errorMessage = 'Аудио не загружено. Возможные причины:\n• Трек недоступен на всех провайдерах\n• Audius сервис временно недоступен\n• Проблемы с интернет-соединением';
+                    } else {
+                      errorMessage = 'Не удалось загрузить аудио. Возможные причины:\n• Трек удалён или недоступен\n• Временные проблемы с Audius\n• Проблемы с интернет-соединением';
+                    }
                   } else {
-                    // Если нет детальной информации об ошибке
                     errorMessage = 'Не удалось загрузить аудио. Возможные причины:\n• Трек удалён или недоступен\n• Временные проблемы с Audius\n• Проблемы с интернет-соединением';
                   }
                 }
@@ -1113,7 +1120,9 @@ function Page() {
                   trackId: selectedTrack?.id,
                   streamId: selectedTrack?.streamId,
                   error: e,
-                  audioSrc: e?.target?.src
+                  audioSrc: e?.target?.src,
+                  readyState: e?.target?.readyState,
+                  networkState: e?.target?.networkState
                 });
               }}
               style={{ display: 'none' }}

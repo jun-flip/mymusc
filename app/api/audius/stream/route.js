@@ -9,6 +9,19 @@ export async function GET(request) {
       return Response.json({ error: 'Track ID is required' }, { status: 400 });
     }
 
+    // Проверяем, не является ли это демо треком
+    if (trackId.startsWith('demo-')) {
+      console.log(`Demo track requested: ${trackId}`);
+      // Возвращаем заглушку для демо треков
+      return new Response('Demo track - no audio available', { 
+        status: 404,
+        headers: {
+          'Content-Type': 'text/plain',
+          'Cache-Control': 'no-cache'
+        }
+      });
+    }
+
     // Получаем рабочие провайдеры
     const providers = await providerManager.getProviders();
     
@@ -97,41 +110,12 @@ export async function GET(request) {
       trackId: trackId
     });
     
-    // Формируем информативное сообщение об ошибке
-    let errorMessage = 'Трек недоступен для воспроизведения';
-    let errorDetails = '';
-    
-    if (lastError?.message?.includes('502') || lastError?.message?.includes('503')) {
-      errorMessage = 'Audius сервис временно недоступен';
-      errorDetails = 'Все discovery провайдеры возвращают ошибки. Попробуйте позже.';
-    } else if (lastError?.message?.includes('404')) {
-      errorMessage = 'Трек не найден';
-      errorDetails = 'Возможно, трек был удалён или недоступен на всех провайдерах.';
-    } else if (lastError?.message?.includes('timeout') || lastError?.message?.includes('abort')) {
-      errorMessage = 'Превышено время ожидания';
-      errorDetails = 'Серверы Audius отвечают слишком медленно.';
-    } else if (lastError?.message?.includes('403') || lastError?.message?.includes('Forbidden')) {
-      errorMessage = 'Доступ запрещён';
-      errorDetails = 'Audius провайдеры блокируют запросы. Возможны проблемы с API.';
-    } else if (lastError?.message?.includes('ENOTFOUND') || lastError?.message?.includes('getaddrinfo')) {
-      errorMessage = 'Провайдеры недоступны';
-      errorDetails = 'DNS ошибки при обращении к Audius серверам. Проверьте интернет-соединение.';
-    } else {
-      errorDetails = `Проблема с доступом к треку. Попробовано провайдеров: ${triedProviders.length}`;
-    }
-    
-    // Возвращаем JSON с ошибкой вместо 404, чтобы клиент мог её обработать
-    return Response.json({ 
-      error: errorMessage,
-      details: errorDetails,
-      trackId: trackId,
-      triedProviders: triedProviders.length,
-      lastError: lastError?.message,
-      unavailable: true
-    }, { 
+    // Возвращаем простой 404 без JSON, чтобы аудио элемент мог корректно обработать ошибку
+    // Аудио элемент ожидает аудио поток, а не JSON с ошибкой
+    return new Response('Track not available', { 
       status: 404,
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/plain',
         'Cache-Control': 'no-cache'
       }
     });
