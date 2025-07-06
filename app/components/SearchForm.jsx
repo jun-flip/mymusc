@@ -75,7 +75,12 @@ function SearchForm({ onSearch, isLoading, searchResults, loadMore, hasMore }) {
   return (
     <div className="search-container">
       <form onSubmit={handleSubmit} className="search-form">
-        <div className="search-input-container">
+        <div className="search-input-container" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          width: '100%'
+        }}>
           <input
             type="text"
             value={query}
@@ -85,6 +90,24 @@ function SearchForm({ onSearch, isLoading, searchResults, loadMore, hasMore }) {
             className="search-input"
             disabled={isLoading}
             aria-label="Поиск треков"
+            style={{
+              flex: 1,
+              height: '44px',
+              padding: '12px 16px',
+              fontSize: '16px',
+              border: '2px solid #333',
+              borderRadius: '8px',
+              backgroundColor: '#1a1a1a',
+              color: '#fff',
+              outline: 'none',
+              transition: 'border-color 0.2s ease'
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = '#ff5500';
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = '#333';
+            }}
           />
           <button 
             type="submit" 
@@ -92,12 +115,34 @@ function SearchForm({ onSearch, isLoading, searchResults, loadMore, hasMore }) {
             disabled={isLoading || !query.trim()}
             aria-label="Начать поиск"
             style={{
-              minWidth: isNarrowScreen ? 'auto' : '80px',
-              padding: isNarrowScreen ? '8px' : '8px 16px'
+              height: '44px',
+              minWidth: isNarrowScreen ? '48px' : '80px',
+              padding: isNarrowScreen ? '8px' : '8px 16px',
+              fontSize: isNarrowScreen ? '18px' : '16px',
+              border: '2px solid #ff5500',
+              borderRadius: '8px',
+              backgroundColor: '#ff5500',
+              color: 'white',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease',
+              outline: 'none'
+            }}
+            onMouseOver={(e) => {
+              if (!isLoading && query.trim()) {
+                e.target.style.backgroundColor = '#e64a19';
+                e.target.style.borderColor = '#e64a19';
+              }
+            }}
+            onMouseOut={(e) => {
+              e.target.style.backgroundColor = '#ff5500';
+              e.target.style.borderColor = '#ff5500';
             }}
           >
             {isLoading 
-              ? (isNarrowScreen ? '🔍' : 'Поиск...') 
+              ? (isNarrowScreen ? '⏳' : 'Поиск...') 
               : (isNarrowScreen ? '🔍' : 'Поиск')
             }
           </button>
