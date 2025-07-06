@@ -116,8 +116,9 @@ function SearchForm({ onSearch, isLoading, searchResults, loadMore, hasMore }) {
             aria-label="Начать поиск"
             style={{
               height: '44px',
-              minWidth: isNarrowScreen ? '48px' : '80px',
-              padding: isNarrowScreen ? '8px' : '8px 16px',
+              width: isNarrowScreen ? '44px' : undefined,
+              minWidth: isNarrowScreen ? undefined : '80px',
+              padding: isNarrowScreen ? '0' : '8px 16px',
               fontSize: isNarrowScreen ? '18px' : '16px',
               border: '2px solid #ff5500',
               borderRadius: '8px',
