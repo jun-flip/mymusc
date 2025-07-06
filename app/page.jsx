@@ -144,7 +144,7 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       const errorMessage = this.state.error?.message || this.state.error?.toString() || 'Неизвестная ошибка';
-      return (
+  return (
         <div style={{ 
           color: '#ff5500', 
           padding: 32, 
@@ -401,16 +401,16 @@ function Page() {
           const parsed = JSON.parse(raw);
           if (parsed && parsed.tracks && Array.isArray(parsed.tracks) && parsed.ts) {
             if (Date.now() - parsed.ts <= PLAYLIST_TTL) {
-              // Добавляем streamId для каждого трека, если его нет
+            // Добавляем streamId для каждого трека, если его нет
               const validTracks = parsed.tracks.filter(track => track && track.id).map(track => ({
-                ...track,
-                streamId: track.streamId || extractTrackNumericId(track.permalink),
+              ...track,
+              streamId: track.streamId || extractTrackNumericId(track.permalink),
               }));
               setPlaylist(validTracks);
-            } else {
-              localStorage.removeItem(PLAYLIST_KEY);
-            }
+          } else {
+            localStorage.removeItem(PLAYLIST_KEY);
           }
+        }
         }
       } catch (error) {
         console.error('Error loading from localStorage:', error);
@@ -520,15 +520,15 @@ function Page() {
   // Воспроизведение/пауза
   const handlePlayPause = () => {
     try {
-      if (!audioRef.current) return;
-      if (audioRef.current.paused) {
+    if (!audioRef.current) return;
+    if (audioRef.current.paused) {
         audioRef.current.play().catch(error => {
           console.error('Error playing audio:', error);
           setIsPlaying(false);
         });
-        setIsPlaying(true);
-      } else {
-        audioRef.current.pause();
+      setIsPlaying(true);
+    } else {
+      audioRef.current.pause();
         setIsPlaying(false);
       }
     } catch (error) {
@@ -545,8 +545,8 @@ function Page() {
     const update = () => {
       try {
         if (audio.currentTime !== undefined && audio.duration !== undefined) {
-          setProgress(audio.currentTime);
-          setDuration(audio.duration);
+      setProgress(audio.currentTime);
+      setDuration(audio.duration);
         }
       } catch (error) {
         console.error('Error updating progress:', error);
@@ -557,8 +557,8 @@ function Page() {
     audio.addEventListener('durationchange', update);
     return () => {
       try {
-        audio.removeEventListener('timeupdate', update);
-        audio.removeEventListener('durationchange', update);
+      audio.removeEventListener('timeupdate', update);
+      audio.removeEventListener('durationchange', update);
       } catch (error) {
         console.error('Error removing event listeners:', error);
       }
@@ -568,9 +568,9 @@ function Page() {
   // Перемотка по прогресс-бару
   const handleSeek = e => {
     try {
-      if (!audioRef.current || !duration) return;
-      const rect = e.target.getBoundingClientRect();
-      const percent = (e.clientX - rect.left) / rect.width;
+    if (!audioRef.current || !duration) return;
+    const rect = e.target.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
       const newTime = percent * duration;
       if (isFinite(newTime) && newTime >= 0) {
         audioRef.current.currentTime = newTime;
@@ -741,7 +741,7 @@ function Page() {
     
     try {
       setSelectedTrack(track);
-      setShouldPlayOnTrackChange(true);
+    setShouldPlayOnTrackChange(true);
       setCurrentTrackIndex(idx);
       setCurrentTrackSource('search');
     } catch (error) {
@@ -769,17 +769,17 @@ function Page() {
     
     const updateBuffered = () => {
       try {
-        const buf = [];
+      const buf = [];
         if (audio.buffered && audio.buffered.length) {
-          for (let i = 0; i < audio.buffered.length; i++) {
+      for (let i = 0; i < audio.buffered.length; i++) {
             const start = audio.buffered.start(i);
             const end = audio.buffered.end(i);
             if (isFinite(start) && isFinite(end) && start >= 0 && end > start) {
               buf.push({ start, end });
             }
           }
-        }
-        setBuffered(buf);
+      }
+      setBuffered(buf);
       } catch (error) {
         console.error('Error updating buffer:', error);
         setBuffered([]);
@@ -787,15 +787,15 @@ function Page() {
     };
     
     try {
-      audio.addEventListener('progress', updateBuffered);
-      updateBuffered();
+    audio.addEventListener('progress', updateBuffered);
+    updateBuffered();
     } catch (error) {
       console.error('Error setting up buffer listener:', error);
     }
     
     return () => {
       try {
-        audio.removeEventListener('progress', updateBuffered);
+      audio.removeEventListener('progress', updateBuffered);
       } catch (error) {
         console.error('Error removing buffer listener:', error);
       }
@@ -824,18 +824,18 @@ function Page() {
     };
     
     try {
-      audio.addEventListener('waiting', handleWaiting);
-      audio.addEventListener('canplay', handleCanPlay);
-      audio.addEventListener('canplaythrough', handleCanPlay);
+    audio.addEventListener('waiting', handleWaiting);
+    audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('canplaythrough', handleCanPlay);
     } catch (error) {
       console.error('Error setting up audio event listeners:', error);
     }
     
     return () => {
       try {
-        audio.removeEventListener('waiting', handleWaiting);
-        audio.removeEventListener('canplay', handleCanPlay);
-        audio.removeEventListener('canplaythrough', handleCanPlay);
+      audio.removeEventListener('waiting', handleWaiting);
+      audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('canplaythrough', handleCanPlay);
       } catch (error) {
         console.error('Error removing audio event listeners:', error);
       }
@@ -845,17 +845,17 @@ function Page() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const savedTab = localStorage.getItem('tab');
+      const savedTab = localStorage.getItem('tab');
         if (savedTab && ['search', 'player'].includes(savedTab)) {
           setTab(savedTab);
         }
         
-        const savedTheme = localStorage.getItem('theme');
+      const savedTheme = localStorage.getItem('theme');
         if (savedTheme && ['light', 'dark'].includes(savedTheme)) {
           setTheme(savedTheme);
         }
         
-        const savedLang = localStorage.getItem('lang');
+      const savedLang = localStorage.getItem('lang');
         if (savedLang && ['ru', 'en'].includes(savedLang)) {
           setLang(savedLang);
         }
@@ -868,7 +868,7 @@ function Page() {
   useEffect(() => {
     if (typeof window !== 'undefined' && tab && ['search', 'player'].includes(tab)) {
       try {
-        localStorage.setItem('tab', tab);
+      localStorage.setItem('tab', tab);
       } catch (error) {
         console.error('Error saving tab to localStorage:', error);
       }
@@ -879,9 +879,9 @@ function Page() {
   useEffect(() => {
     if (typeof window !== 'undefined' && theme && ['light', 'dark'].includes(theme)) {
       try {
-        document.body.classList.toggle('theme-light', theme === 'light');
-        document.body.classList.toggle('theme-dark', theme === 'dark');
-        localStorage.setItem('theme', theme);
+      document.body.classList.toggle('theme-light', theme === 'light');
+      document.body.classList.toggle('theme-dark', theme === 'dark');
+      localStorage.setItem('theme', theme);
       } catch (error) {
         console.error('Error applying theme:', error);
       }
@@ -891,7 +891,7 @@ function Page() {
   useEffect(() => {
     if (typeof window !== 'undefined' && lang && ['ru', 'en'].includes(lang)) {
       try {
-        localStorage.setItem('lang', lang);
+      localStorage.setItem('lang', lang);
       } catch (error) {
         console.error('Error saving language to localStorage:', error);
       }
@@ -910,8 +910,8 @@ function Page() {
           console.error('Error playing audio in tryPlay:', error);
           setIsPlaying(false);
         });
-        setIsPlaying(true);
-        setShouldPlayOnTrackChange(false);
+      setIsPlaying(true);
+      setShouldPlayOnTrackChange(false);
       } catch (error) {
         console.error('Error in tryPlay:', error);
         setIsPlaying(false);
@@ -920,9 +920,9 @@ function Page() {
     };
     
     try {
-      if (audio.readyState >= 3) {
-        tryPlay();
-      } else {
+    if (audio.readyState >= 3) {
+      tryPlay();
+    } else {
         const handleCanPlay = () => {
           try {
             tryPlay();
@@ -932,7 +932,7 @@ function Page() {
         };
         
         audio.addEventListener('canplay', handleCanPlay, { once: true });
-        return () => {
+      return () => {
           try {
             audio.removeEventListener('canplay', handleCanPlay);
           } catch (error) {
@@ -1033,16 +1033,16 @@ function Page() {
         />
         
         <div className="main-content">
-          <BurgerMenu tab={tab} setTab={setTab} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} t={t} />
-          <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
-          {selectedTrack && selectedTrack.streamId && (
-            <audio
-              ref={audioRef}
+      <BurgerMenu tab={tab} setTab={setTab} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} t={t} />
+      <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
+      {selectedTrack && selectedTrack.streamId && (
+        <audio
+          ref={audioRef}
               src={`/api/audius/stream?id=${selectedTrack.streamId}`}
-              autoPlay={isPlaying}
-              onEnded={playNext}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
+          autoPlay={isPlaying}
+          onEnded={playNext}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
               onError={(e) => {
                 console.error('Audio error details:', {
                   error: e,
@@ -1115,13 +1115,13 @@ function Page() {
                   networkState: e?.target?.networkState
                 });
               }}
-              style={{ display: 'none' }}
-              controls={false}
-            />
-          )}
-          {tab === 'search' && (
-          <div className="App">
-            <h1><span style={{ color: '#ff5500' }}>FREE</span>ZBY</h1>
+          style={{ display: 'none' }}
+          controls={false}
+        />
+      )}
+      {tab === 'search' && (
+      <div className="App">
+        <h1><span style={{ color: '#ff5500' }}>FREE</span>ZBY</h1>
             
             {/* Форма поиска */}
             <div className="search-section">
@@ -1182,8 +1182,8 @@ function Page() {
                     >
                       Загрузить еще
                     </button>
-                  </div>
-                )}
+          </div>
+        )}
                 
                 {/* Индикатор загрузки для "Загрузить еще" */}
                 {isSearching && hasMoreResults && (
@@ -1198,121 +1198,121 @@ function Page() {
             {(!searchResults || searchResults.length === 0) && !isSearching && (
               <>
                 {!loading && (!tracks || tracks.length === 0) && (
-                  <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>{t.nothingFound}</div>
-                )}
-                <ul style={{ listStyle: 'none', padding: 0 }}>
+            <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>{t.nothingFound}</div>
+        )}
+        <ul style={{ listStyle: 'none', padding: 0 }}>
                   {Array.isArray(tracks) && tracks.map((track, idx) => {
                     if (!track || !track.id) {
                       console.warn('Skipping invalid track in render:', track);
                       return null;
                     }
                     return (
-                      <TrackCard
-                        key={track.id}
-                        track={track}
-                        idx={idx}
-                        selectedTrack={selectedTrack}
-                        isPlaying={isPlaying}
-                        progress={selectedTrack && track.id === selectedTrack.id ? progress : 0}
-                        duration={selectedTrack && track.id === selectedTrack.id ? duration : 0}
+              <TrackCard
+                key={track.id}
+                track={track}
+                idx={idx}
+                selectedTrack={selectedTrack}
+                isPlaying={isPlaying}
+                progress={selectedTrack && track.id === selectedTrack.id ? progress : 0}
+                duration={selectedTrack && track.id === selectedTrack.id ? duration : 0}
                         playFromSearch={safePlayFromSearch}
                         openPlayerPopup={safeOpenPlayerPopup}
                         addToPlaylist={safeAddToPlaylist}
-                        IconPlay={IconPlay}
-                        IconPause={IconPause}
-                        IconPlaylistAdd={IconPlaylistAdd}
+                IconPlay={IconPlay}
+                IconPause={IconPause}
+                IconPlaylistAdd={IconPlaylistAdd}
                         isTrackUnavailable={isTrackUnavailable}
                         aria-label={`Воспроизвести трек ${track.title || 'Без названия'}`}
-                      />
+              />
                     );
                   })}
-                </ul>
-                {hasMore && !loading && (
-                  <div style={{ textAlign: 'center', margin: '20px 0' }}>
-                    <button onClick={loadMoreTracks} style={{ padding: 10, fontSize: 16 }}>{t.next}</button>
-                  </div>
+        </ul>
+        {hasMore && !loading && (
+          <div style={{ textAlign: 'center', margin: '20px 0' }}>
+              <button onClick={loadMoreTracks} style={{ padding: 10, fontSize: 16 }}>{t.next}</button>
+            </div>
                 )}
               </>
+          )}
+        </div>
+      )}
+      {tab === 'player' && (
+        <div className="App app-player">
+          <div className="player-container">
+            {isNarrow ? (
+              <MiniPlayer
+                asPortal={false}
+                selectedTrack={selectedTrack}
+                isPlaying={isPlaying}
+                onPlayPause={handlePlayPause}
+                onNext={playNext}
+                onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
+                progress={progress}
+                duration={duration}
+                formatTime={formatTime}
+                IconPlay={IconPlay}
+                IconPause={IconPause}
+              />
+            ) : (
+              <Player
+                selectedTrack={selectedTrack}
+                isPlaying={isPlaying}
+                audioRef={audioRef}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={playNext}
+                playNext={playNext}
+                playPrev={playPrev}
+                progress={progress}
+                duration={duration}
+                buffered={buffered}
+                isBuffering={isBuffering}
+                handleSeek={handleSeek}
+                handlePlayPause={handlePlayPause}
+                formatTime={formatTime}
+                IconPrev={IconPrev}
+                IconNext={IconNext}
+                IconPlay={IconPlay}
+                IconPause={IconPause}
+              />
             )}
           </div>
-          )}
-          {tab === 'player' && (
-            <div className="App app-player">
-              <div className="player-container">
-                {isNarrow ? (
-                  <MiniPlayer
-                    asPortal={false}
-                    selectedTrack={selectedTrack}
-                    isPlaying={isPlaying}
-                    onPlayPause={handlePlayPause}
-                    onNext={playNext}
-                    onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
-                    progress={progress}
-                    duration={duration}
-                    formatTime={formatTime}
-                    IconPlay={IconPlay}
-                    IconPause={IconPause}
-                  />
-                ) : (
-                  <Player
-                    selectedTrack={selectedTrack}
-                    isPlaying={isPlaying}
-                    audioRef={audioRef}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                    onEnded={playNext}
-                    playNext={playNext}
-                    playPrev={playPrev}
-                    progress={progress}
-                    duration={duration}
-                    buffered={buffered}
-                    isBuffering={isBuffering}
-                    handleSeek={handleSeek}
-                    handlePlayPause={handlePlayPause}
-                    formatTime={formatTime}
-                    IconPrev={IconPrev}
-                    IconNext={IconNext}
-                    IconPlay={IconPlay}
-                    IconPause={IconPause}
-                  />
-                )}
-              </div>
-              {playlist.length > 0 && (
-                <Playlist
-                  playlist={playlist}
-                          selectedTrack={selectedTrack}
-                          playFromPlaylist={playFromPlaylist}
-                          openPlayerPopup={openPlayerPopup}
-                          removeFromPlaylist={removeFromPlaylist}
-                  clearPlaylist={clearPlaylist}
-                          isDragging={isDragging}
-                  setIsDragging={setIsDragging}
-                  sensors={sensors}
-                  IconChevronDown={IconChevronDown}
-                  IconChevronUp={IconChevronUp}
-                  arrayMove={arrayMove}
-                  playlistCollapsed={playlistCollapsed}
-                  setPlaylistCollapsed={setPlaylistCollapsed}
-                />
-              )}
-            </div>
-          )}
-          {/* Мини-плеер: показываем только если выбран трек и tab === 'search' */}
-          {tab === 'search' && selectedTrack && (
-            <MiniPlayer
-              asPortal={true}
-              selectedTrack={selectedTrack}
-              isPlaying={isPlaying}
-              onPlayPause={handlePlayPause}
-              onNext={playNext}
-              onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
-              progress={progress}
-              duration={duration}
-              formatTime={formatTime}
-              IconPlay={IconPlay}
-              IconPause={IconPause}
+          {playlist.length > 0 && (
+            <Playlist
+              playlist={playlist}
+                      selectedTrack={selectedTrack}
+                      playFromPlaylist={playFromPlaylist}
+                      openPlayerPopup={openPlayerPopup}
+                      removeFromPlaylist={removeFromPlaylist}
+              clearPlaylist={clearPlaylist}
+                      isDragging={isDragging}
+              setIsDragging={setIsDragging}
+              sensors={sensors}
+              IconChevronDown={IconChevronDown}
+              IconChevronUp={IconChevronUp}
+              arrayMove={arrayMove}
+              playlistCollapsed={playlistCollapsed}
+              setPlaylistCollapsed={setPlaylistCollapsed}
             />
           )}
+        </div>
+      )}
+      {/* Мини-плеер: показываем только если выбран трек и tab === 'search' */}
+      {tab === 'search' && selectedTrack && (
+        <MiniPlayer
+          asPortal={true}
+          selectedTrack={selectedTrack}
+          isPlaying={isPlaying}
+          onPlayPause={handlePlayPause}
+          onNext={playNext}
+          onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
+          progress={progress}
+          duration={duration}
+          formatTime={formatTime}
+          IconPlay={IconPlay}
+          IconPause={IconPause}
+        />
+      )}
         </div>
       </div>
     </ErrorBoundary>
