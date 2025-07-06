@@ -37,16 +37,30 @@ export async function GET(req) {
   for (const base of providers) {
     try {
       const url = `${base}/tracks/search?query=${encodeURIComponent(q)}&app_name=audiofeel&limit=20&offset=${offset}`;
+      console.log(`Trying provider: ${base}`);
       const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
+        console.log(`Success from ${base}, data:`, data);
+        // Проверяем, что data.data существует и является массивом
+        if (!data || !Array.isArray(data.data)) {
+          console.error(`Invalid data format from ${base}:`, data);
+          continue;
+        }
         return NextResponse.json(data);
       } else {
         lastError = await response.text();
+        console.error(`Provider ${base} failed with status ${response.status}:`, lastError);
       }
     } catch (e) {
       lastError = e?.message || e;
+      console.error(`Provider ${base} threw error:`, e);
     }
   }
-  return NextResponse.json({ error: 'All Audius providers failed', details: lastError }, { status: 502 });
+  console.error('All providers failed, last error:', lastError);
+  return NextResponse.json({ 
+    error: 'All Audius providers failed', 
+    details: lastError,
+    message: 'Не удалось подключиться к сервису поиска. Попробуйте позже.'
+  }, { status: 502 });
 } 

@@ -60,7 +60,18 @@ const IconChevronUp = ({color = '#ff5500'}) => (
 
 // Компонент для сортируемого трека
 function SortableTrack({ track, idx, selectedTrack, playFromPlaylist, openPlayerPopup, removeFromPlaylist, isDragging }) {
+  // Проверяем, что track существует и имеет необходимые свойства
+  if (!track || !track.id) {
+    console.error('Invalid track in SortableTrack:', track);
+    return null;
+  }
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging: isDraggingItem } = useSortable({ id: track.id });
+  
+  const trackTitle = track.title || 'Без названия';
+  const artistName = track.user?.name || 'Неизвестный исполнитель';
+  const artworkUrl = track.artwork?.['150x150'] || 'https://audius.co/favicon.ico';
+
   return (
     <li
       ref={setNodeRef}
@@ -80,37 +91,150 @@ function SortableTrack({ track, idx, selectedTrack, playFromPlaylist, openPlayer
         transition,
       }}
     >
-      <img src={track.artwork && track.artwork['150x150'] ? track.artwork['150x150'] : 'https://audius.co/favicon.ico'} alt={track.title} width={40} height={40} style={{ borderRadius: 8, marginRight: 10, objectFit: 'cover' }} />
+      <img src={artworkUrl} alt={trackTitle} width={40} height={40} style={{ borderRadius: 8, marginRight: 10, objectFit: 'cover' }} />
       <span style={{ flex: 1 }}>
-        <b>{track.title}</b> <br />
-        <span style={{ color: '#aaa' }}>{track.user && track.user.name}</span>
+        <b>{trackTitle}</b> <br />
+        <span style={{ color: '#aaa' }}>{artistName}</span>
       </span>
-      <button className="track-play-btn" onClick={() => { playFromPlaylist(idx); openPlayerPopup(); }}><IconPlay /></button>
-      <button className="playlist-btn" title="Удалить из плейлиста" onClick={e => { e.stopPropagation(); removeFromPlaylist(track.id); }} disabled={isDragging}><IconDelete /></button>
+      <button className="track-play-btn" onClick={() => { 
+        try {
+          playFromPlaylist(idx); 
+          openPlayerPopup(); 
+        } catch (error) {
+          console.error('Error playing track:', error);
+        }
+      }}><IconPlay /></button>
+      <button className="playlist-btn" title="Удалить из плейлиста" onClick={e => { 
+        e.stopPropagation(); 
+        try {
+          removeFromPlaylist(track.id); 
+        } catch (error) {
+          console.error('Error removing track:', error);
+        }
+      }} disabled={isDragging}><IconDelete /></button>
     </li>
   );
 }
 
 // Вспомогательная функция для извлечения числового id из permalink
 function extractTrackNumericId(permalink) {
-  if (!permalink) return null;
+  if (!permalink || typeof permalink !== 'string') {
+    console.warn('Invalid permalink:', permalink);
+    return null;
+  }
   const match = permalink.match(/-(\d+)$/);
   return match ? match[1] : null;
 }
 
-function ErrorBoundary({ children }) {
-  const [error, setError] = useState(null);
-  if (error) {
-    return <div style={{ color: '#ff5500', padding: 32, textAlign: 'center', fontSize: 20 }}>Что-то пошло не так: {error.message || error.toString()}</div>;
+// Правильный Error Boundary компонент
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
   }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Error caught by boundary:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      const errorMessage = this.state.error?.message || this.state.error?.toString() || 'Неизвестная ошибка';
+      return (
+        <div style={{ 
+          color: '#ff5500', 
+          padding: 32, 
+          textAlign: 'center', 
+          fontSize: 20,
+          background: '#1a1a1a',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center'
+        }}>
+          <h2>Что-то пошло не так</h2>
+          <p style={{ color: '#aaa', fontSize: 16, marginTop: 10 }}>{errorMessage}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{
+              marginTop: 20,
+              padding: '10px 20px',
+              background: '#ff5500',
+              color: 'white',
+              border: 'none',
+              borderRadius: 5,
+              cursor: 'pointer',
+              fontSize: 16
+            }}
+          >
+            Перезагрузить страницу
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Компонент для обработки ошибок сети
+function NetworkErrorHandler({ error, onRetry, onClose }) {
+  if (!error) return null;
+
   return (
-    <React.Suspense fallback={<div style={{ color: '#ff5500', padding: 32, textAlign: 'center', fontSize: 20 }}>Загрузка...</div>}>
-      {React.Children.map(children, child =>
-        React.isValidElement(child)
-          ? React.cloneElement(child, { onError: setError })
-          : child
+    <div style={{
+      position: 'fixed',
+      top: 20,
+      right: 20,
+      background: '#ff5500',
+      color: 'white',
+      padding: '15px 20px',
+      borderRadius: 8,
+      boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+      zIndex: 1000,
+      maxWidth: 300,
+      fontSize: 14
+    }}>
+      <div style={{ marginBottom: 10 }}>
+        <strong>Ошибка сети:</strong>
+        <button 
+          onClick={onClose}
+          style={{
+            float: 'right',
+            background: 'none',
+            border: 'none',
+            color: 'white',
+            cursor: 'pointer',
+            fontSize: 18
+          }}
+        >
+          ×
+        </button>
+      </div>
+      <p style={{ margin: '5px 0', fontSize: 12 }}>{error}</p>
+      {onRetry && (
+        <button 
+          onClick={onRetry}
+          style={{
+            background: 'rgba(255,255,255,0.2)',
+            border: 'none',
+            color: 'white',
+            padding: '5px 10px',
+            borderRadius: 4,
+            cursor: 'pointer',
+            fontSize: 12,
+            marginTop: 10
+          }}
+        >
+          Попробовать снова
+        </button>
       )}
-    </React.Suspense>
+    </div>
   );
 }
 
@@ -191,43 +315,83 @@ function Page() {
   const [isClient, setIsClient] = useState(false);
   const isNarrow = useMediaQuery('(max-width: 600px)');
   const [shouldPlayOnTrackChange, setShouldPlayOnTrackChange] = useState(false);
+  const [networkError, setNetworkError] = useState(null); // состояние для ошибок сети
 
   useEffect(() => { setIsClient(true); }, []);
 
   // Инициализация query и playlist из localStorage только на клиенте
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      setQuery(localStorage.getItem('lastQuery') || '');
       try {
+        const savedQuery = localStorage.getItem('lastQuery');
+        if (savedQuery && typeof savedQuery === 'string') {
+          setQuery(savedQuery);
+        }
+        
         const raw = localStorage.getItem(PLAYLIST_KEY);
         if (raw) {
-          const { tracks, ts } = JSON.parse(raw);
-          if (Date.now() - ts <= PLAYLIST_TTL) {
-            // Добавляем streamId для каждого трека, если его нет
-            setPlaylist((tracks || []).map(track => ({
-              ...track,
-              streamId: track.streamId || extractTrackNumericId(track.permalink),
-            })));
-          } else {
-            localStorage.removeItem(PLAYLIST_KEY);
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.tracks && Array.isArray(parsed.tracks) && parsed.ts) {
+            if (Date.now() - parsed.ts <= PLAYLIST_TTL) {
+              // Добавляем streamId для каждого трека, если его нет
+              const validTracks = parsed.tracks.filter(track => track && track.id).map(track => ({
+                ...track,
+                streamId: track.streamId || extractTrackNumericId(track.permalink),
+              }));
+              setPlaylist(validTracks);
+            } else {
+              localStorage.removeItem(PLAYLIST_KEY);
+            }
           }
         }
-      } catch {
-        // Ошибка при чтении из localStorage
+      } catch (error) {
+        console.error('Error loading from localStorage:', error);
+        // Очищаем поврежденные данные
+        try {
+          localStorage.removeItem('lastQuery');
+          localStorage.removeItem(PLAYLIST_KEY);
+        } catch (cleanupError) {
+          console.error('Error cleaning up localStorage:', cleanupError);
+        }
       }
     }
   }, []);
 
   // Автофокус на поле поиска
-  useEffect(() => { inputRef.current && inputRef.current.focus(); }, []);
+  useEffect(() => { 
+    try {
+      if (inputRef.current && typeof inputRef.current.focus === 'function') {
+        inputRef.current.focus();
+      }
+    } catch (error) {
+      console.error('Error focusing input:', error);
+    }
+  }, []);
 
   // Сохранять последний запрос
-  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('lastQuery', query); }, [query]);
+  useEffect(() => { 
+    if (typeof window !== 'undefined' && query && typeof query === 'string') {
+      try {
+        localStorage.setItem('lastQuery', query);
+      } catch (error) {
+        console.error('Error saving query to localStorage:', error);
+      }
+    }
+  }, [query]);
 
   // Сохранять плейлист
   useEffect(() => {
     if (isDragging) return; // Не синхронизируем во время drag
-    if (typeof window !== 'undefined') localStorage.setItem(PLAYLIST_KEY, JSON.stringify({ tracks: playlist, ts: Date.now() }));
+    if (typeof window !== 'undefined' && Array.isArray(playlist)) {
+      try {
+        localStorage.setItem(PLAYLIST_KEY, JSON.stringify({ 
+          tracks: playlist.filter(track => track && track.id), 
+          ts: Date.now() 
+        }));
+      } catch (error) {
+        console.error('Error saving playlist to localStorage:', error);
+      }
+    }
   }, [playlist, isDragging]);
 
   // Логирование изменений playlist и isDragging
@@ -272,17 +436,35 @@ function Page() {
 
   // Добавить в плейлист
   const addToPlaylist = track => {
-    setPlaylist(pl => pl.find(t => t.id === track.id) ? pl : [...pl, { ...track, streamId: track.streamId || extractTrackNumericId(track.permalink) }]);
+    if (!track || !track.id) {
+      console.error('Cannot add invalid track to playlist:', track);
+      return;
+    }
+    
+    const trackWithStreamId = {
+      ...track,
+      streamId: track.streamId || extractTrackNumericId(track.permalink),
+    };
+    
+    setPlaylist(pl => pl.find(t => t.id === track.id) ? pl : [...pl, trackWithStreamId]);
   };
 
   // Воспроизведение/пауза
   const handlePlayPause = () => {
-    if (!audioRef.current) return;
-    if (audioRef.current.paused) {
-      audioRef.current.play();
-      setIsPlaying(true);
-    } else {
-      audioRef.current.pause();
+    try {
+      if (!audioRef.current) return;
+      if (audioRef.current.paused) {
+        audioRef.current.play().catch(error => {
+          console.error('Error playing audio:', error);
+          setIsPlaying(false);
+        });
+        setIsPlaying(true);
+      } else {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      }
+    } catch (error) {
+      console.error('Error in handlePlayPause:', error);
       setIsPlaying(false);
     }
   };
@@ -291,24 +473,43 @@ function Page() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    
     const update = () => {
-      setProgress(audio.currentTime);
-      setDuration(audio.duration);
+      try {
+        if (audio.currentTime !== undefined && audio.duration !== undefined) {
+          setProgress(audio.currentTime);
+          setDuration(audio.duration);
+        }
+      } catch (error) {
+        console.error('Error updating progress:', error);
+      }
     };
+    
     audio.addEventListener('timeupdate', update);
     audio.addEventListener('durationchange', update);
     return () => {
-      audio.removeEventListener('timeupdate', update);
-      audio.removeEventListener('durationchange', update);
+      try {
+        audio.removeEventListener('timeupdate', update);
+        audio.removeEventListener('durationchange', update);
+      } catch (error) {
+        console.error('Error removing event listeners:', error);
+      }
     };
   }, [selectedTrack]);
 
   // Перемотка по прогресс-бару
   const handleSeek = e => {
-    if (!audioRef.current || !duration) return;
-    const rect = e.target.getBoundingClientRect();
-    const percent = (e.clientX - rect.left) / rect.width;
-    audioRef.current.currentTime = percent * duration;
+    try {
+      if (!audioRef.current || !duration) return;
+      const rect = e.target.getBoundingClientRect();
+      const percent = (e.clientX - rect.left) / rect.width;
+      const newTime = percent * duration;
+      if (isFinite(newTime) && newTime >= 0) {
+        audioRef.current.currentTime = newTime;
+      }
+    } catch (error) {
+      console.error('Error in handleSeek:', error);
+    }
   };
 
   // Сбросить плеер полностью (останавливаем музыку)
@@ -330,18 +531,36 @@ function Page() {
     try {
       const cleanQuery = query.replace(/#/g, '');
       const response = await fetch(`/api/audius/search?q=${encodeURIComponent(cleanQuery)}&offset=0`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
-      const newTracks = (data.data || []).map(track => ({
-        ...track,
-        streamId: extractTrackNumericId(track.permalink),
-      }));
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      const newTracks = (data.data || []).map(track => {
+        if (!track || !track.id) {
+          console.warn('Skipping invalid track:', track);
+          return null;
+        }
+        return {
+          ...track,
+          streamId: extractTrackNumericId(track.permalink),
+        };
+      }).filter(Boolean); // Удаляем null значения
       setTracks(newTracks);
       setHasMore(newTracks.length === 20);
       setOffset(20);
       // Если playing трек был из поиска, но его больше нет — сохраняем selectedTrack и isPlaying
       // (ничего не сбрасываем)
-    } catch {
-      alert('Ошибка поиска треков!');
+    } catch (error) {
+      console.error('Search error:', error);
+      const errorMessage = error.message || 'Ошибка поиска треков!';
+      setNetworkError(errorMessage);
     }
     setLoading(false);
   };
@@ -352,16 +571,34 @@ function Page() {
     try {
       const cleanQuery = query.replace(/#/g, '');
       const response = await fetch(`/api/audius/search?q=${encodeURIComponent(cleanQuery)}&offset=${offset}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const data = await response.json();
-      const newTracks = (data.data || []).map(track => ({
-        ...track,
-        streamId: extractTrackNumericId(track.permalink),
-      }));
+      
+      if (data.error) {
+        throw new Error(data.error);
+      }
+      
+      const newTracks = (data.data || []).map(track => {
+        if (!track || !track.id) {
+          console.warn('Skipping invalid track:', track);
+          return null;
+        }
+        return {
+          ...track,
+          streamId: extractTrackNumericId(track.permalink),
+        };
+      }).filter(Boolean); // Удаляем null значения
       setTracks(prev => [...prev, ...newTracks]);
       setHasMore(newTracks.length === 20);
       setOffset(prev => prev + 20);
-    } catch {
-      alert('Ошибка загрузки треков!');
+    } catch (error) {
+      console.error('Load more error:', error);
+      const errorMessage = error.message || 'Ошибка загрузки треков!';
+      setNetworkError(errorMessage);
     }
     setLoading(false);
   };
@@ -376,11 +613,17 @@ function Page() {
 
   // Воспроизвести из плейлиста
   const playFromPlaylist = idx => {
-    if (selectedTrack && playlist[idx] && selectedTrack.id === playlist[idx].id) {
+    const track = playlist[idx];
+    if (!track || !track.id) {
+      console.error('Cannot play invalid track from playlist:', track);
+      return;
+    }
+    
+    if (selectedTrack && track.id === selectedTrack.id) {
       // Уже выбран этот трек — не перезапускать
       return;
     }
-    setSelectedTrack(playlist[idx]);
+    setSelectedTrack(track);
     setShouldPlayOnTrackChange(true);
     setExpanded(false);
     setPlayingFromPlaylist(true);
@@ -388,7 +631,12 @@ function Page() {
 
   // Воспроизвести из поиска
   const playFromSearch = idx => {
-    setSelectedTrack(tracks[idx]);
+    const track = tracks[idx];
+    if (!track || !track.id) {
+      console.error('Cannot play invalid track:', track);
+      return;
+    }
+    setSelectedTrack(track);
     setShouldPlayOnTrackChange(true);
     setExpanded(false);
     setPlayingFromPlaylist(false);
@@ -411,20 +659,39 @@ function Page() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    
     const updateBuffered = () => {
-      const buf = [];
-      for (let i = 0; i < audio.buffered.length; i++) {
-        buf.push({
-          start: audio.buffered.start(i),
-          end: audio.buffered.end(i),
-        });
+      try {
+        const buf = [];
+        if (audio.buffered && audio.buffered.length) {
+          for (let i = 0; i < audio.buffered.length; i++) {
+            const start = audio.buffered.start(i);
+            const end = audio.buffered.end(i);
+            if (isFinite(start) && isFinite(end) && start >= 0 && end > start) {
+              buf.push({ start, end });
+            }
+          }
+        }
+        setBuffered(buf);
+      } catch (error) {
+        console.error('Error updating buffer:', error);
+        setBuffered([]);
       }
-      setBuffered(buf);
     };
-    audio.addEventListener('progress', updateBuffered);
-    updateBuffered();
+    
+    try {
+      audio.addEventListener('progress', updateBuffered);
+      updateBuffered();
+    } catch (error) {
+      console.error('Error setting up buffer listener:', error);
+    }
+    
     return () => {
-      audio.removeEventListener('progress', updateBuffered);
+      try {
+        audio.removeEventListener('progress', updateBuffered);
+      } catch (error) {
+        console.error('Error removing buffer listener:', error);
+      }
     };
   }, [selectedTrack]);
 
@@ -432,47 +699,95 @@ function Page() {
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const handleWaiting = () => setIsBuffering(true);
-    const handleCanPlay = () => setIsBuffering(false);
-    audio.addEventListener('waiting', handleWaiting);
-    audio.addEventListener('canplay', handleCanPlay);
-    audio.addEventListener('canplaythrough', handleCanPlay);
+    
+    const handleWaiting = () => {
+      try {
+        setIsBuffering(true);
+      } catch (error) {
+        console.error('Error in handleWaiting:', error);
+      }
+    };
+    
+    const handleCanPlay = () => {
+      try {
+        setIsBuffering(false);
+      } catch (error) {
+        console.error('Error in handleCanPlay:', error);
+      }
+    };
+    
+    try {
+      audio.addEventListener('waiting', handleWaiting);
+      audio.addEventListener('canplay', handleCanPlay);
+      audio.addEventListener('canplaythrough', handleCanPlay);
+    } catch (error) {
+      console.error('Error setting up audio event listeners:', error);
+    }
+    
     return () => {
-      audio.removeEventListener('waiting', handleWaiting);
-      audio.removeEventListener('canplay', handleCanPlay);
-      audio.removeEventListener('canplaythrough', handleCanPlay);
+      try {
+        audio.removeEventListener('waiting', handleWaiting);
+        audio.removeEventListener('canplay', handleCanPlay);
+        audio.removeEventListener('canplaythrough', handleCanPlay);
+      } catch (error) {
+        console.error('Error removing audio event listeners:', error);
+      }
     };
   }, [selectedTrack]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedTab = localStorage.getItem('tab');
-      if (savedTab) setTab(savedTab);
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme) setTheme(savedTheme);
-      const savedLang = localStorage.getItem('lang');
-      if (savedLang) setLang(savedLang);
+      try {
+        const savedTab = localStorage.getItem('tab');
+        if (savedTab && ['search', 'player'].includes(savedTab)) {
+          setTab(savedTab);
+        }
+        
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme && ['light', 'dark'].includes(savedTheme)) {
+          setTheme(savedTheme);
+        }
+        
+        const savedLang = localStorage.getItem('lang');
+        if (savedLang && ['ru', 'en'].includes(savedLang)) {
+          setLang(savedLang);
+        }
+      } catch (error) {
+        console.error('Error loading settings from localStorage:', error);
+      }
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('tab', tab);
+    if (typeof window !== 'undefined' && tab && ['search', 'player'].includes(tab)) {
+      try {
+        localStorage.setItem('tab', tab);
+      } catch (error) {
+        console.error('Error saving tab to localStorage:', error);
+      }
     }
     // Не сбрасываем selectedTrack и isPlaying при смене tab
   }, [tab]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      document.body.classList.toggle('theme-light', theme === 'light');
-      document.body.classList.toggle('theme-dark', theme === 'dark');
-      localStorage.setItem('theme', theme);
+    if (typeof window !== 'undefined' && theme && ['light', 'dark'].includes(theme)) {
+      try {
+        document.body.classList.toggle('theme-light', theme === 'light');
+        document.body.classList.toggle('theme-dark', theme === 'dark');
+        localStorage.setItem('theme', theme);
+      } catch (error) {
+        console.error('Error applying theme:', error);
+      }
     }
   }, [theme]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('lang', lang);
+    if (typeof window !== 'undefined' && lang && ['ru', 'en'].includes(lang)) {
+      try {
+        localStorage.setItem('lang', lang);
+      } catch (error) {
+        console.error('Error saving language to localStorage:', error);
+      }
     }
   }, [lang]);
 
@@ -481,25 +796,101 @@ function Page() {
     if (!selectedTrack || !shouldPlayOnTrackChange) return;
     const audio = audioRef.current;
     if (!audio) return;
+    
     const tryPlay = () => {
-      audio.play().catch(() => {});
-      setIsPlaying(true);
-      setShouldPlayOnTrackChange(false);
+      try {
+        audio.play().catch(error => {
+          console.error('Error playing audio in tryPlay:', error);
+          setIsPlaying(false);
+        });
+        setIsPlaying(true);
+        setShouldPlayOnTrackChange(false);
+      } catch (error) {
+        console.error('Error in tryPlay:', error);
+        setIsPlaying(false);
+        setShouldPlayOnTrackChange(false);
+      }
     };
-    if (audio.readyState >= 3) {
-      tryPlay();
-    } else {
-      audio.addEventListener('canplay', tryPlay, { once: true });
-      return () => {
-        audio.removeEventListener('canplay', tryPlay);
-      };
+    
+    try {
+      if (audio.readyState >= 3) {
+        tryPlay();
+      } else {
+        const handleCanPlay = () => {
+          try {
+            tryPlay();
+          } catch (error) {
+            console.error('Error in canplay handler:', error);
+          }
+        };
+        
+        audio.addEventListener('canplay', handleCanPlay, { once: true });
+        return () => {
+          try {
+            audio.removeEventListener('canplay', handleCanPlay);
+          } catch (error) {
+            console.error('Error removing canplay listener:', error);
+          }
+        };
+      }
+    } catch (error) {
+      console.error('Error setting up audio play:', error);
+      setIsPlaying(false);
+      setShouldPlayOnTrackChange(false);
     }
   }, [selectedTrack, shouldPlayOnTrackChange]);
 
-  const t = translations[lang];
+  const t = translations[lang] || translations.ru; // fallback на русский
+
+  // Проверяем, что все необходимые функции существуют
+  const safePlayFromSearch = (idx) => {
+    try {
+      if (typeof playFromSearch === 'function') {
+        playFromSearch(idx);
+      } else {
+        console.error('playFromSearch is not a function');
+      }
+    } catch (error) {
+      console.error('Error in playFromSearch:', error);
+    }
+  };
+
+  const safeOpenPlayerPopup = () => {
+    try {
+      if (typeof openPlayerPopup === 'function') {
+        openPlayerPopup();
+      } else {
+        console.error('openPlayerPopup is not a function');
+      }
+    } catch (error) {
+      console.error('Error in openPlayerPopup:', error);
+    }
+  };
+
+  const safeAddToPlaylist = (track) => {
+    try {
+      if (typeof addToPlaylist === 'function') {
+        addToPlaylist(track);
+      } else {
+        console.error('addToPlaylist is not a function');
+      }
+    } catch (error) {
+      console.error('Error in addToPlaylist:', error);
+    }
+  };
 
   return (
     <ErrorBoundary>
+      <NetworkErrorHandler 
+        error={networkError} 
+        onRetry={() => {
+          setNetworkError(null);
+          if (query) {
+            searchTracks({ preventDefault: () => {} });
+          }
+        }}
+        onClose={() => setNetworkError(null)}
+      />
       <BurgerMenu tab={tab} setTab={setTab} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} t={t} />
       <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
       {selectedTrack && selectedTrack.streamId && (
@@ -510,6 +901,11 @@ function Page() {
           onEnded={playNext}
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
+          onError={(e) => {
+            console.error('Audio error:', e);
+            setIsPlaying(false);
+            setNetworkError('Ошибка воспроизведения аудио');
+          }}
           style={{ display: 'none' }}
           controls={false}
         />
@@ -526,11 +922,16 @@ function Page() {
               <span style={{ position: 'absolute', left: -9999 }} aria-live="polite">Загрузка...</span>
           </div>
         )}
-        {!loading && tracks.length === 0 && (
+        {!loading && (!tracks || tracks.length === 0) && (
             <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>{t.nothingFound}</div>
         )}
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {tracks.map((track, idx) => (
+          {Array.isArray(tracks) && tracks.map((track, idx) => {
+            if (!track || !track.id) {
+              console.warn('Skipping invalid track in render:', track);
+              return null;
+            }
+            return (
               <TrackCard
                 key={track.id}
                 track={track}
@@ -539,15 +940,16 @@ function Page() {
                 isPlaying={isPlaying}
                 progress={selectedTrack && track.id === selectedTrack.id ? progress : 0}
                 duration={selectedTrack && track.id === selectedTrack.id ? duration : 0}
-                playFromSearch={playFromSearch}
-                openPlayerPopup={openPlayerPopup}
-                addToPlaylist={addToPlaylist}
+                playFromSearch={safePlayFromSearch}
+                openPlayerPopup={safeOpenPlayerPopup}
+                addToPlaylist={safeAddToPlaylist}
                 IconPlay={IconPlay}
                 IconPause={IconPause}
                 IconPlaylistAdd={IconPlaylistAdd}
-                aria-label={`Воспроизвести трек ${track.title}`}
+                aria-label={`Воспроизвести трек ${track.title || 'Без названия'}`}
               />
-          ))}
+            );
+          })}
         </ul>
         {hasMore && !loading && (
           <div style={{ textAlign: 'center', margin: '20px 0' }}>
