@@ -6,6 +6,7 @@ function MiniPlayer({
   isPlaying,
   onPlayPause,
   onNext,
+  onPrev,
   onClose,
   progress,
   duration,
@@ -30,7 +31,10 @@ function MiniPlayer({
           <span>{formatTime(progress)}</span>
           <span>{formatTime(duration)}</span>
         </div>
-        <div className="mini-player-controls mini-player-controls--bottom">
+        <div className="mini-player-controls mini-player-controls--bottom" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <button className="mini-player-btn" onClick={onPrev} aria-label="Предыдущий трек">
+            <svg width="24" height="24" viewBox="0 0 24 24"><path d="M6 6V18M19 6L10 12L19 18V6Z" stroke="#ff5500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
           <button className="mini-player-btn" onClick={onPlayPause} aria-label={isPlaying ? 'Пауза' : 'Воспроизвести'}>
             {isPlaying ? <IconPause /> : <IconPlay />}
           </button>

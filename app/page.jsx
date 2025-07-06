@@ -741,9 +741,8 @@ function Page() {
     
     try {
       setSelectedTrack(track);
-    setShouldPlayOnTrackChange(true);
-      setCurrentTrackIndex(idx);
-      setCurrentTrackSource('search');
+      setShouldPlayOnTrackChange(true);
+      setPlayingFromPlaylist(false); // Устанавливаем что играем из поиска, а не из плейлиста
     } catch (error) {
       console.error('Error in playFromSearch:', error);
     }
@@ -1246,6 +1245,7 @@ function Page() {
                 isPlaying={isPlaying}
                 onPlayPause={handlePlayPause}
                 onNext={playNext}
+                onPrev={playPrev}
                 onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
                 progress={progress}
                 duration={duration}
@@ -1305,6 +1305,7 @@ function Page() {
           isPlaying={isPlaying}
           onPlayPause={handlePlayPause}
           onNext={playNext}
+          onPrev={playPrev}
           onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
           progress={progress}
           duration={duration}
