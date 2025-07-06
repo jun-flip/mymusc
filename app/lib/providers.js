@@ -235,7 +235,20 @@ class AudiusProviderManager {
       'https://audius-discovery-47.cultur3stake.com',
       'https://audius-discovery-48.cultur3stake.com',
       'https://audius-discovery-49.cultur3stake.com',
-      'https://audius-discovery-50.cultur3stake.com'
+      'https://audius-discovery-50.cultur3stake.com',
+      // Добавляем альтернативные провайдеры
+      'https://discoveryprovider.audius.co',
+      'https://api.audius.co',
+      'https://discoveryprovider.audius-prod-1.poised-bush-6f6f.audius.co',
+      'https://discoveryprovider.audius-prod-2.poised-bush-6f6f.audius.co',
+      'https://discoveryprovider.audius-prod-3.poised-bush-6f6f.audius.co',
+      'https://discoveryprovider.audius-prod-4.poised-bush-6f6f.audius.co',
+      'https://discoveryprovider.audius-prod-5.poised-bush-6f6f.audius.co',
+      'https://discoveryprovider.audius-prod-6.poised-bush-6f6f.audius.co',
+      'https://discoveryprovider.audius-prod-7.poised-bush-6f6f.audius.co',
+      'https://discoveryprovider.audius-prod-8.poised-bush-6f6f.audius.co',
+      'https://discoveryprovider.audius-prod-9.poised-bush-6f6f.audius.co',
+      'https://discoveryprovider.audius-prod-10.poised-bush-6f6f.audius.co'
     ];
   }
 

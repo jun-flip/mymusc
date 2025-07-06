@@ -110,17 +110,31 @@ export async function GET(request) {
     } else if (lastError?.message?.includes('timeout') || lastError?.message?.includes('abort')) {
       errorMessage = 'Превышено время ожидания';
       errorDetails = 'Серверы Audius отвечают слишком медленно.';
+    } else if (lastError?.message?.includes('403') || lastError?.message?.includes('Forbidden')) {
+      errorMessage = 'Доступ запрещён';
+      errorDetails = 'Audius провайдеры блокируют запросы. Возможны проблемы с API.';
+    } else if (lastError?.message?.includes('ENOTFOUND') || lastError?.message?.includes('getaddrinfo')) {
+      errorMessage = 'Провайдеры недоступны';
+      errorDetails = 'DNS ошибки при обращении к Audius серверам. Проверьте интернет-соединение.';
     } else {
       errorDetails = `Проблема с доступом к треку. Попробовано провайдеров: ${triedProviders.length}`;
     }
     
+    // Возвращаем JSON с ошибкой вместо 404, чтобы клиент мог её обработать
     return Response.json({ 
       error: errorMessage,
       details: errorDetails,
       trackId: trackId,
       triedProviders: triedProviders.length,
-      lastError: lastError?.message
-    }, { status: 404 });
+      lastError: lastError?.message,
+      unavailable: true
+    }, { 
+      status: 404,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      }
+    });
 
   } catch (error) {
     console.error('Stream API error:', error);

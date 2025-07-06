@@ -1048,7 +1048,7 @@ function Page() {
           {selectedTrack && selectedTrack.streamId && (
             <audio
               ref={audioRef}
-              src={`/api/audius/stream/${selectedTrack.streamId}`}
+              src={`/api/audius/stream?id=${selectedTrack.streamId}`}
               autoPlay={isPlaying}
               onEnded={playNext}
               onPlay={() => setIsPlaying(true)}
@@ -1061,7 +1061,8 @@ function Page() {
                   errorMessage: e?.target?.error?.message,
                   trackId: selectedTrack?.id,
                   streamId: selectedTrack?.streamId,
-                  trackTitle: selectedTrack?.title
+                  trackTitle: selectedTrack?.title,
+                  audioSrc: e?.target?.src
                 });
                 
                 setIsPlaying(false);
@@ -1093,8 +1094,14 @@ function Page() {
                       errorMessage = `Ошибка воспроизведения (код: ${error.code}). Возможные причины:\n• Трек временно недоступен\n• Проблемы с Audius сервисом\n• Трек был удалён`;
                   }
                 } else {
-                  // Если нет детальной информации об ошибке
-                  errorMessage = 'Не удалось загрузить аудио. Возможные причины:\n• Трек удалён или недоступен\n• Временные проблемы с Audius\n• Проблемы с интернет-соединением';
+                  // Проверяем, не получили ли мы JSON с ошибкой вместо аудио
+                  const audioSrc = e?.target?.src;
+                  if (audioSrc && audioSrc.includes('/api/audius/stream')) {
+                    errorMessage = 'Audius сервис временно недоступен. Возможные причины:\n• Все провайдеры Audius заблокированы или недоступны\n• Проблемы с интернет-соединением\n• Трек удалён или недоступен на всех провайдерах';
+                  } else {
+                    // Если нет детальной информации об ошибке
+                    errorMessage = 'Не удалось загрузить аудио. Возможные причины:\n• Трек удалён или недоступен\n• Временные проблемы с Audius\n• Проблемы с интернет-соединением';
+                  }
                 }
                 
                 setNetworkError(errorMessage);
@@ -1105,7 +1112,8 @@ function Page() {
                   artist: selectedTrack?.user?.name,
                   trackId: selectedTrack?.id,
                   streamId: selectedTrack?.streamId,
-                  error: e
+                  error: e,
+                  audioSrc: e?.target?.src
                 });
               }}
               style={{ display: 'none' }}
