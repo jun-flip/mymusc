@@ -1,8 +1,26 @@
 import React, { useState, useCallback } from 'react';
 
+// Хук для медиа-запроса
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(false);
+  
+  React.useEffect(() => {
+    const media = window.matchMedia(query);
+    if (media.matches !== matches) setMatches(media.matches);
+    const listener = () => setMatches(media.matches);
+    media.addEventListener('change', listener);
+    return () => media.removeEventListener('change', listener);
+  }, [matches, query]);
+  
+  return matches;
+}
+
 function SearchForm({ onSearch, isLoading, searchResults, loadMore, hasMore }) {
   const [query, setQuery] = useState('');
   const [error, setError] = useState('');
+  
+  // Определяем, является ли экран узким (меньше 480px)
+  const isNarrowScreen = useMediaQuery('(max-width: 480px)');
 
   const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
@@ -73,8 +91,15 @@ function SearchForm({ onSearch, isLoading, searchResults, loadMore, hasMore }) {
             className="search-button"
             disabled={isLoading || !query.trim()}
             aria-label="Начать поиск"
+            style={{
+              minWidth: isNarrowScreen ? 'auto' : '80px',
+              padding: isNarrowScreen ? '8px' : '8px 16px'
+            }}
           >
-            {isLoading ? '🔍' : '🔍'}
+            {isLoading 
+              ? (isNarrowScreen ? '🔍' : 'Поиск...') 
+              : (isNarrowScreen ? '🔍' : 'Поиск')
+            }
           </button>
         </div>
       </form>
