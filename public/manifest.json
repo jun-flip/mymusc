@@ -1,21 +1,35 @@
 {
-  "name": "FREEZBY Player",
-  "short_name": "FREEZBY",
+  "name": "AudioFEEL - Music Player",
+  "short_name": "AudioFEEL",
+  "description": "Современный музыкальный плеер с поиском треков",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#181818",
-  "theme_color": "#ff5500",
-  "description": "Аудиоплеер с поддержкой плейлистов и поиска треков.",
+  "background_color": "#000000",
+  "theme_color": "#FF5500",
+  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
-  ]
+  ],
+  "categories": ["music", "entertainment"],
+  "lang": "ru",
+  "dir": "ltr",
+  "scope": "/",
+  "prefer_related_applications": false
 } 

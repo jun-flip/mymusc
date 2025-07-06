@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-function TrackCard({ track, idx, selectedTrack, isPlaying, progress, duration, playFromSearch, openPlayerPopup, addToPlaylist, IconPlay, IconPause, IconPlaylistAdd }) {
+function TrackCard({ track, idx, selectedTrack, isPlaying, progress, duration, playFromSearch, openPlayerPopup, addToPlaylist, IconPlay, IconPause, IconPlaylistAdd, isTrackUnavailable }) {
   // Проверяем, что track существует и имеет необходимые свойства
   if (!track || !track.id) {
     console.error('Invalid track data:', track);
@@ -25,7 +25,13 @@ function TrackCard({ track, idx, selectedTrack, isPlaying, progress, duration, p
 
   const trackTitle = track.title || 'Без названия';
   const artistName = track.user?.name || 'Неизвестный исполнитель';
-  const artworkUrl = track.artwork?.['150x150'] || 'https://audius.co/favicon.ico';
+  const defaultArtworkUrl = 'https://audius.co/favicon.ico';
+  
+  // Состояние для обработки ошибок загрузки изображений
+  const [imageError, setImageError] = useState(false);
+  const [currentArtworkUrl, setCurrentArtworkUrl] = useState(
+    track.artwork?.['150x150'] || defaultArtworkUrl
+  );
 
   // Безопасные обработчики событий
   const handlePlayClick = () => {
@@ -49,13 +55,31 @@ function TrackCard({ track, idx, selectedTrack, isPlaying, progress, duration, p
     }
   };
 
+  // Обработчик ошибки загрузки изображения
+  const handleImageError = () => {
+    if (!imageError) {
+      setImageError(true);
+      setCurrentArtworkUrl(defaultArtworkUrl);
+    }
+  };
+
   // Проверяем валидность прогресса и длительности
   const validProgress = typeof progress === 'number' && isFinite(progress) && progress >= 0 ? progress : 0;
   const validDuration = typeof duration === 'number' && isFinite(duration) && duration > 0 ? duration : 0;
   const progressPercent = validDuration > 0 ? Math.min(100, (validProgress / validDuration) * 100) : 0;
 
+  // Определяем, недоступен ли трек
+  const isUnavailable = isTrackUnavailable && isTrackUnavailable(track.id);
+
   return (
-    <li key={track.id} className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''} style={{ marginBottom: 10, display: 'flex', alignItems: 'center', position: 'relative', overflow: 'hidden' }}>
+    <li key={track.id} className={selectedTrack && track.id === selectedTrack.id ? 'track-active' : ''} style={{ 
+      marginBottom: 10, 
+      display: 'flex', 
+      alignItems: 'center', 
+      position: 'relative', 
+      overflow: 'hidden',
+      opacity: isUnavailable ? 0.6 : 1
+    }}>
       {/* Прогрессбар для активного трека */}
       {selectedTrack && track.id === selectedTrack.id && validDuration > 0 && (
         <div className="track-progress-bar" style={{
@@ -70,20 +94,48 @@ function TrackCard({ track, idx, selectedTrack, isPlaying, progress, duration, p
           pointerEvents: 'none',
         }} />
       )}
+      
+      {/* Индикатор недоступности трека */}
+      {isUnavailable && (
+        <div style={{
+          position: 'absolute',
+          top: 5,
+          right: 5,
+          background: '#ff6b6b',
+          color: 'white',
+          fontSize: 10,
+          padding: '2px 6px',
+          borderRadius: 10,
+          zIndex: 2,
+          fontWeight: 'bold'
+        }}>
+          ⚠️
+        </div>
+      )}
+      
       <img 
-        src={artworkUrl} 
+        src={currentArtworkUrl} 
         alt={trackTitle} 
         width={50} 
         height={50} 
-        style={{ borderRadius: 8, marginRight: 10, objectFit: 'cover', zIndex: 1 }}
-        onError={(e) => {
-          console.warn('Failed to load artwork for track:', trackTitle);
-          e.target.src = 'https://audius.co/favicon.ico';
+        style={{ 
+          borderRadius: 8, 
+          marginRight: 10, 
+          objectFit: 'cover', 
+          zIndex: 1,
+          filter: isUnavailable ? 'grayscale(50%)' : 'none'
         }}
+        onError={handleImageError}
+        onLoad={() => setImageError(false)}
       />
-      <div className="track-card-content" style={{ zIndex: 1 }}>
-        <div className="track-card-title">{trackTitle}</div>
-        <div className="track-card-meta">
+      <div className="track-card-content" style={{ zIndex: 1, flex: 1 }}>
+        <div className="track-card-title" style={{ 
+          color: isUnavailable ? '#888' : 'inherit',
+          textDecoration: isUnavailable ? 'line-through' : 'none'
+        }}>
+          {trackTitle}
+        </div>
+        <div className="track-card-meta" style={{ color: isUnavailable ? '#666' : '#aaa' }}>
           {artistName}
           {track.duration ? (
             <span style={{ color: '#666', marginLeft: 8 }}>{track.duration}</span>
@@ -91,13 +143,23 @@ function TrackCard({ track, idx, selectedTrack, isPlaying, progress, duration, p
           {track.album && track.album.title && (
             <span style={{ color: '#ff5500', marginLeft: 8 }}>{track.album.title}</span>
           )}
+          {isUnavailable && (
+            <span style={{ color: '#ff6b6b', marginLeft: 8, fontSize: 12 }}>
+              Недоступен
+            </span>
+          )}
         </div>
       </div>
       <div className="track-card-buttons" style={{ zIndex: 1 }}>
         <button 
           className="track-play-btn" 
           onClick={handlePlayClick} 
+          disabled={isUnavailable}
           aria-label={`Воспроизвести трек ${trackTitle}`}
+          style={{
+            opacity: isUnavailable ? 0.5 : 1,
+            cursor: isUnavailable ? 'not-allowed' : 'pointer'
+          }}
         >
           {selectedTrack && track.id === selectedTrack.id && isPlaying
             ? (IconPause ? <IconPause /> : '⏸')

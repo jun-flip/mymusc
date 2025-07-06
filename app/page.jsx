@@ -183,8 +183,11 @@ class ErrorBoundary extends React.Component {
 }
 
 // Компонент для обработки ошибок сети
-function NetworkErrorHandler({ error, onRetry, onClose }) {
+function NetworkErrorHandler({ error, onRetry, onClose, onSkipNext }) {
   if (!error) return null;
+
+  // Разбиваем сообщение на строки для лучшего отображения
+  const errorLines = error.split('\n').filter(line => line.trim());
 
   return (
     <div style={{
@@ -197,43 +200,102 @@ function NetworkErrorHandler({ error, onRetry, onClose }) {
       borderRadius: 8,
       boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
       zIndex: 1000,
-      maxWidth: 300,
-      fontSize: 14
+      maxWidth: 400,
+      fontSize: 14,
+      lineHeight: 1.4
     }}>
-      <div style={{ marginBottom: 10 }}>
-        <strong>Ошибка сети:</strong>
+      <div style={{ marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <strong style={{ fontSize: 16 }}>⚠️ Ошибка воспроизведения</strong>
         <button 
           onClick={onClose}
           style={{
-            float: 'right',
             background: 'none',
             border: 'none',
             color: 'white',
             cursor: 'pointer',
-            fontSize: 18
+            fontSize: 18,
+            padding: 0,
+            marginLeft: 10,
+            lineHeight: 1
           }}
+          aria-label="Закрыть"
         >
           ×
         </button>
       </div>
-      <p style={{ margin: '5px 0', fontSize: 12 }}>{error}</p>
-      {onRetry && (
+      
+      <div style={{ marginBottom: 15 }}>
+        {errorLines.map((line, index) => (
+          <p key={index} style={{ 
+            margin: index === 0 ? '0 0 8px 0' : '0 0 4px 0', 
+            fontSize: index === 0 ? 14 : 13,
+            opacity: index === 0 ? 1 : 0.9
+          }}>
+            {line}
+          </p>
+        ))}
+      </div>
+      
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        {onRetry && (
+          <button 
+            onClick={onRetry}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 'bold',
+              transition: 'background 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.3)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
+          >
+            🔄 Попробовать снова
+          </button>
+        )}
+        
+        {onSkipNext && (
+          <button 
+            onClick={onSkipNext}
+            style={{
+              background: 'rgba(255,255,255,0.15)',
+              border: 'none',
+              color: 'white',
+              padding: '8px 16px',
+              borderRadius: 4,
+              cursor: 'pointer',
+              fontSize: 13,
+              transition: 'background 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.25)'}
+            onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.15)'}
+          >
+            ⏭️ Следующий трек
+          </button>
+        )}
+        
         <button 
-          onClick={onRetry}
+          onClick={onClose}
           style={{
-            background: 'rgba(255,255,255,0.2)',
+            background: 'rgba(255,255,255,0.1)',
             border: 'none',
             color: 'white',
-            padding: '5px 10px',
+            padding: '8px 16px',
             borderRadius: 4,
             cursor: 'pointer',
-            fontSize: 12,
-            marginTop: 10
+            fontSize: 13,
+            transition: 'background 0.2s'
           }}
+          onMouseOver={(e) => e.target.style.background = 'rgba(255,255,255,0.2)'}
+          onMouseOut={(e) => e.target.style.background = 'rgba(255,255,255,0.1)'}
         >
-          Попробовать снова
+          Закрыть
         </button>
-      )}
+      </div>
     </div>
   );
 }
@@ -289,7 +351,7 @@ function Page() {
   const [tracks, setTracks] = useState([]);
   const [selectedTrack, setSelectedTrack] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [expanded, setExpanded] = useState(false);
@@ -316,6 +378,12 @@ function Page() {
   const isNarrow = useMediaQuery('(max-width: 600px)');
   const [shouldPlayOnTrackChange, setShouldPlayOnTrackChange] = useState(false);
   const [networkError, setNetworkError] = useState(null); // состояние для ошибок сети
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchError, setSearchError] = useState(null);
+  const [hasMoreResults, setHasMoreResults] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [unavailableTracks, setUnavailableTracks] = useState(new Set());
 
   useEffect(() => { setIsClient(true); }, []);
 
@@ -522,85 +590,119 @@ function Page() {
     setShowPlayerPopup(false);
   };
 
-  const searchTracks = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setTracks([]);
-    setOffset(0);
-    setHasMore(false);
+  const searchTracks = async (query) => {
+    if (!query || !query.trim()) {
+      console.warn('Empty search query');
+      return;
+    }
+
+    setSearchQuery(query.trim());
+    setIsSearching(true);
+    setSearchError(null);
+    
     try {
-      const cleanQuery = query.replace(/#/g, '');
-      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(cleanQuery)}&offset=0`);
+      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(query.trim())}&offset=0&limit=20`);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Search API error:', response.status, errorText);
+        
+        let errorMessage = 'Ошибка поиска';
+        if (response.status === 502 || response.status === 503) {
+          errorMessage = 'Сервис поиска временно недоступен. Попробуйте позже или поищите "demo" для тестовых треков.';
+        } else if (response.status === 404) {
+          errorMessage = 'Поиск не найден';
+        } else if (response.status >= 500) {
+          errorMessage = 'Внутренняя ошибка сервера';
+        }
+        
+        throw new Error(errorMessage);
       }
-      
+
       const data = await response.json();
       
-      if (data.error) {
-        throw new Error(data.error);
+      if (!data || !Array.isArray(data.data)) {
+        console.error('Invalid search response:', data);
+        throw new Error('Неверный формат ответа от сервера');
       }
+
+      // Валидируем данные треков
+      const validTracks = data.data.filter(track => 
+        track && 
+        track.id && 
+        track.title && 
+        typeof track.title === 'string' &&
+        track.title.trim().length > 0
+      );
+
+      if (validTracks.length === 0) {
+        setSearchResults([]);
+        setSearchError('По вашему запросу ничего не найдено');
+      } else {
+        setSearchResults(validTracks);
+        setSearchError(null);
+      }
+
+      setHasMoreResults(validTracks.length === 20);
+      console.log(`Search successful: ${validTracks.length} tracks found`);
       
-      const newTracks = (data.data || []).map(track => {
-        if (!track || !track.id) {
-          console.warn('Skipping invalid track:', track);
-          return null;
-        }
-        return {
-          ...track,
-          streamId: extractTrackNumericId(track.permalink),
-        };
-      }).filter(Boolean); // Удаляем null значения
-      setTracks(newTracks);
-      setHasMore(newTracks.length === 20);
-      setOffset(20);
-      // Если playing трек был из поиска, но его больше нет — сохраняем selectedTrack и isPlaying
-      // (ничего не сбрасываем)
     } catch (error) {
       console.error('Search error:', error);
-      const errorMessage = error.message || 'Ошибка поиска треков!';
-      setNetworkError(errorMessage);
+      setSearchResults([]);
+      setSearchError(error.message || 'Произошла ошибка при поиске');
+    } finally {
+      setIsSearching(false);
     }
-    setLoading(false);
   };
 
-  // Функция для подгрузки ещё треков
   const loadMoreTracks = async () => {
-    setLoading(true);
+    if (!searchQuery || !searchQuery.trim() || isSearching || !hasMoreResults) {
+      return;
+    }
+
+    setIsSearching(true);
+    
     try {
-      const cleanQuery = query.replace(/#/g, '');
-      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(cleanQuery)}&offset=${offset}`);
+      const nextOffset = searchResults.length;
+      const response = await fetch(`/api/audius/search?q=${encodeURIComponent(searchQuery.trim())}&offset=${nextOffset}&limit=20`);
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('Load more API error:', response.status, errorText);
+        throw new Error('Ошибка загрузки дополнительных результатов');
       }
-      
+
       const data = await response.json();
       
-      if (data.error) {
-        throw new Error(data.error);
+      if (!data || !Array.isArray(data.data)) {
+        console.error('Invalid load more response:', data);
+        throw new Error('Неверный формат ответа от сервера');
       }
+
+      // Валидируем новые данные треков
+      const validNewTracks = data.data.filter(track => 
+        track && 
+        track.id && 
+        track.title && 
+        typeof track.title === 'string' &&
+        track.title.trim().length > 0
+      );
+
+      if (validNewTracks.length > 0) {
+        setSearchResults(prev => [...prev, ...validNewTracks]);
+        setHasMoreResults(validNewTracks.length === 20); // Если получили меньше 20, значит больше нет
+      } else {
+        setHasMoreResults(false);
+      }
+
+      console.log(`Load more successful: ${validNewTracks.length} additional tracks`);
       
-      const newTracks = (data.data || []).map(track => {
-        if (!track || !track.id) {
-          console.warn('Skipping invalid track:', track);
-          return null;
-        }
-        return {
-          ...track,
-          streamId: extractTrackNumericId(track.permalink),
-        };
-      }).filter(Boolean); // Удаляем null значения
-      setTracks(prev => [...prev, ...newTracks]);
-      setHasMore(newTracks.length === 20);
-      setOffset(prev => prev + 20);
     } catch (error) {
       console.error('Load more error:', error);
-      const errorMessage = error.message || 'Ошибка загрузки треков!';
-      setNetworkError(errorMessage);
+      setSearchError(error.message || 'Ошибка загрузки дополнительных результатов');
+    } finally {
+      setIsSearching(false);
     }
-    setLoading(false);
   };
 
   // Удалить из плейлиста
@@ -631,15 +733,20 @@ function Page() {
 
   // Воспроизвести из поиска
   const playFromSearch = idx => {
-    const track = tracks[idx];
+    const track = searchResults[idx];
     if (!track || !track.id) {
       console.error('Cannot play invalid track:', track);
       return;
     }
-    setSelectedTrack(track);
-    setShouldPlayOnTrackChange(true);
-    setExpanded(false);
-    setPlayingFromPlaylist(false);
+    
+    try {
+      setSelectedTrack(track);
+      setShouldPlayOnTrackChange(true);
+      setCurrentTrackIndex(idx);
+      setCurrentTrackSource('search');
+    } catch (error) {
+      console.error('Error in playFromSearch:', error);
+    }
   };
 
   // Открыть попап-плеер
@@ -879,162 +986,251 @@ function Page() {
     }
   };
 
+  // Функция для повторной попытки воспроизведения текущего трека
+  const retryCurrentTrack = () => {
+    if (!selectedTrack) return;
+    
+    console.log('Retrying playback for track:', selectedTrack.title);
+    setNetworkError(null); // Очищаем ошибку
+    
+    // Сбрасываем состояние аудио
+    if (audioRef.current) {
+      try {
+        audioRef.current.load(); // Перезагружаем аудио элемент
+        setShouldPlayOnTrackChange(true); // Запускаем воспроизведение
+      } catch (error) {
+        console.error('Error retrying track:', error);
+        setNetworkError('Не удалось повторить воспроизведение');
+      }
+    }
+  };
+
+  // Функция для перехода к следующему треку при ошибке
+  const skipToNextOnError = () => {
+    console.log('Skipping to next track due to error');
+    setNetworkError(null);
+    playNext();
+  };
+
+  // Функция для проверки недоступности трека
+  const isTrackUnavailable = (trackId) => {
+    return unavailableTracks.has(trackId);
+  };
+
+  // Функция для отметки трека как недоступного
+  const markTrackAsUnavailable = (trackId) => {
+    setUnavailableTracks(prev => new Set([...prev, trackId]));
+  };
+
   return (
     <ErrorBoundary>
-      <NetworkErrorHandler 
-        error={networkError} 
-        onRetry={() => {
-          setNetworkError(null);
-          if (query) {
-            searchTracks({ preventDefault: () => {} });
-          }
-        }}
-        onClose={() => setNetworkError(null)}
-      />
-      <BurgerMenu tab={tab} setTab={setTab} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} t={t} />
-      <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
-      {selectedTrack && selectedTrack.streamId && (
-        <audio
-          ref={audioRef}
-          src={`/api/audius/stream/${selectedTrack.streamId}`}
-          autoPlay={isPlaying}
-          onEnded={playNext}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          onError={(e) => {
-            console.error('Audio error:', e);
-            setIsPlaying(false);
-            setNetworkError('Ошибка воспроизведения аудио');
-          }}
-          style={{ display: 'none' }}
-          controls={false}
+      <div className="app">
+        <NetworkErrorHandler 
+          error={networkError} 
+          onRetry={retryCurrentTrack}
+          onClose={() => setNetworkError(null)}
+          onSkipNext={skipToNextOnError}
         />
-      )}
-      {tab === 'search' && (
-      <div className="App">
-        <h1><span style={{ color: '#ff5500' }}>FREE</span>ZBY</h1>
-          <SearchForm query={query} setQuery={setQuery} onSubmit={searchTracks} inputRef={inputRef} />
-        {loading && (
-            <div className="loader" role="status" aria-live="polite">
-            <span className="loader-dot"></span>
-            <span className="loader-dot"></span>
-            <span className="loader-dot"></span>
-              <span style={{ position: 'absolute', left: -9999 }} aria-live="polite">Загрузка...</span>
+        
+        <div className="main-content">
+          <div className="search-section">
+            <SearchForm 
+              onSearch={searchTracks}
+              isLoading={isSearching}
+              searchResults={searchResults}
+              loadMore={loadMoreTracks}
+              hasMore={hasMoreResults}
+            />
           </div>
-        )}
-        {!loading && (!tracks || tracks.length === 0) && (
-            <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>{t.nothingFound}</div>
-        )}
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {Array.isArray(tracks) && tracks.map((track, idx) => {
-            if (!track || !track.id) {
-              console.warn('Skipping invalid track in render:', track);
-              return null;
-            }
-            return (
-              <TrackCard
-                key={track.id}
-                track={track}
-                idx={idx}
-                selectedTrack={selectedTrack}
-                isPlaying={isPlaying}
-                progress={selectedTrack && track.id === selectedTrack.id ? progress : 0}
-                duration={selectedTrack && track.id === selectedTrack.id ? duration : 0}
-                playFromSearch={safePlayFromSearch}
-                openPlayerPopup={safeOpenPlayerPopup}
-                addToPlaylist={safeAddToPlaylist}
-                IconPlay={IconPlay}
-                IconPause={IconPause}
-                IconPlaylistAdd={IconPlaylistAdd}
-                aria-label={`Воспроизвести трек ${track.title || 'Без названия'}`}
-              />
-            );
-          })}
-        </ul>
-        {hasMore && !loading && (
-          <div style={{ textAlign: 'center', margin: '20px 0' }}>
-              <button onClick={loadMoreTracks} style={{ padding: 10, fontSize: 16 }}>{t.next}</button>
+
+          <BurgerMenu tab={tab} setTab={setTab} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} t={t} />
+          <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
+          {selectedTrack && selectedTrack.streamId && (
+            <audio
+              ref={audioRef}
+              src={`/api/audius/stream/${selectedTrack.streamId}`}
+              autoPlay={isPlaying}
+              onEnded={playNext}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
+              onError={(e) => {
+                console.error('Audio error details:', {
+                  error: e,
+                  errorType: e?.type,
+                  errorCode: e?.target?.error?.code,
+                  errorMessage: e?.target?.error?.message,
+                  trackId: selectedTrack?.id,
+                  streamId: selectedTrack?.streamId,
+                  trackTitle: selectedTrack?.title
+                });
+                
+                setIsPlaying(false);
+                
+                // Отмечаем трек как недоступный
+                if (selectedTrack?.id) {
+                  markTrackAsUnavailable(selectedTrack.id);
+                }
+                
+                // Определяем тип ошибки и показываем соответствующее сообщение
+                let errorMessage = 'Не удалось воспроизвести трек';
+                
+                if (e?.target?.error) {
+                  const error = e.target.error;
+                  switch (error.code) {
+                    case 1: // MEDIA_ERR_ABORTED
+                      errorMessage = 'Воспроизведение было прервано';
+                      break;
+                    case 2: // MEDIA_ERR_NETWORK
+                      errorMessage = 'Ошибка сети при загрузке аудио. Возможные причины:\n• Проблемы с интернет-соединением\n• Audius сервис временно недоступен\n• Трек удалён или недоступен';
+                      break;
+                    case 3: // MEDIA_ERR_DECODE
+                      errorMessage = 'Ошибка декодирования аудио файла';
+                      break;
+                    case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+                      errorMessage = 'Формат аудио не поддерживается';
+                      break;
+                    default:
+                      errorMessage = `Ошибка воспроизведения (код: ${error.code}). Возможные причины:\n• Трек временно недоступен\n• Проблемы с Audius сервисом\n• Трек был удалён`;
+                  }
+                } else {
+                  // Если нет детальной информации об ошибке
+                  errorMessage = 'Не удалось загрузить аудио. Возможные причины:\n• Трек удалён или недоступен\n• Временные проблемы с Audius\n• Проблемы с интернет-соединением';
+                }
+                
+                setNetworkError(errorMessage);
+                
+                // Логируем для диагностики
+                console.warn('Audio playback failed:', {
+                  track: selectedTrack?.title,
+                  artist: selectedTrack?.user?.name,
+                  trackId: selectedTrack?.id,
+                  streamId: selectedTrack?.streamId,
+                  error: e
+                });
+              }}
+              style={{ display: 'none' }}
+              controls={false}
+            />
+          )}
+          {tab === 'search' && (
+          <div className="App">
+            <h1><span style={{ color: '#ff5500' }}>FREE</span>ZBY</h1>
+            {!loading && (!tracks || tracks.length === 0) && (
+                <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>{t.nothingFound}</div>
+            )}
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {Array.isArray(tracks) && tracks.map((track, idx) => {
+                if (!track || !track.id) {
+                  console.warn('Skipping invalid track in render:', track);
+                  return null;
+                }
+                return (
+                  <TrackCard
+                    key={track.id}
+                    track={track}
+                    idx={idx}
+                    selectedTrack={selectedTrack}
+                    isPlaying={isPlaying}
+                    progress={selectedTrack && track.id === selectedTrack.id ? progress : 0}
+                    duration={selectedTrack && track.id === selectedTrack.id ? duration : 0}
+                    playFromSearch={safePlayFromSearch}
+                    openPlayerPopup={safeOpenPlayerPopup}
+                    addToPlaylist={safeAddToPlaylist}
+                    IconPlay={IconPlay}
+                    IconPause={IconPause}
+                    IconPlaylistAdd={IconPlaylistAdd}
+                    isTrackUnavailable={isTrackUnavailable}
+                    aria-label={`Воспроизвести трек ${track.title || 'Без названия'}`}
+                  />
+                );
+              })}
+            </ul>
+            {hasMore && !loading && (
+              <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                  <button onClick={loadMoreTracks} style={{ padding: 10, fontSize: 16 }}>{t.next}</button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
-      {tab === 'player' && (
-        <div className="App app-player">
-          <div className="player-container">
-            {isNarrow ? (
-              <MiniPlayer
-                asPortal={false}
-                selectedTrack={selectedTrack}
-                isPlaying={isPlaying}
-                onPlayPause={handlePlayPause}
-                onNext={playNext}
-                onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
-                progress={progress}
-                duration={duration}
-                formatTime={formatTime}
-                IconPlay={IconPlay}
-                IconPause={IconPause}
-              />
-            ) : (
-              <Player
-                selectedTrack={selectedTrack}
-                isPlaying={isPlaying}
-                audioRef={audioRef}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onEnded={playNext}
-                playNext={playNext}
-                playPrev={playPrev}
-                progress={progress}
-                duration={duration}
-                buffered={buffered}
-                isBuffering={isBuffering}
-                handleSeek={handleSeek}
-                handlePlayPause={handlePlayPause}
-                formatTime={formatTime}
-                IconPrev={IconPrev}
-                IconNext={IconNext}
-                IconPlay={IconPlay}
-                IconPause={IconPause}
-              />
-            )}
-          </div>
-          {playlist.length > 0 && (
-            <Playlist
-              playlist={playlist}
-                      selectedTrack={selectedTrack}
-                      playFromPlaylist={playFromPlaylist}
-                      openPlayerPopup={openPlayerPopup}
-                      removeFromPlaylist={removeFromPlaylist}
-              clearPlaylist={clearPlaylist}
-                      isDragging={isDragging}
-              setIsDragging={setIsDragging}
-              sensors={sensors}
-              IconChevronDown={IconChevronDown}
-              IconChevronUp={IconChevronUp}
-              arrayMove={arrayMove}
-              playlistCollapsed={playlistCollapsed}
-              setPlaylistCollapsed={setPlaylistCollapsed}
+          {tab === 'player' && (
+            <div className="App app-player">
+              <div className="player-container">
+                {isNarrow ? (
+                  <MiniPlayer
+                    asPortal={false}
+                    selectedTrack={selectedTrack}
+                    isPlaying={isPlaying}
+                    onPlayPause={handlePlayPause}
+                    onNext={playNext}
+                    onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
+                    progress={progress}
+                    duration={duration}
+                    formatTime={formatTime}
+                    IconPlay={IconPlay}
+                    IconPause={IconPause}
+                  />
+                ) : (
+                  <Player
+                    selectedTrack={selectedTrack}
+                    isPlaying={isPlaying}
+                    audioRef={audioRef}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onEnded={playNext}
+                    playNext={playNext}
+                    playPrev={playPrev}
+                    progress={progress}
+                    duration={duration}
+                    buffered={buffered}
+                    isBuffering={isBuffering}
+                    handleSeek={handleSeek}
+                    handlePlayPause={handlePlayPause}
+                    formatTime={formatTime}
+                    IconPrev={IconPrev}
+                    IconNext={IconNext}
+                    IconPlay={IconPlay}
+                    IconPause={IconPause}
+                  />
+                )}
+              </div>
+              {playlist.length > 0 && (
+                <Playlist
+                  playlist={playlist}
+                          selectedTrack={selectedTrack}
+                          playFromPlaylist={playFromPlaylist}
+                          openPlayerPopup={openPlayerPopup}
+                          removeFromPlaylist={removeFromPlaylist}
+                  clearPlaylist={clearPlaylist}
+                          isDragging={isDragging}
+                  setIsDragging={setIsDragging}
+                  sensors={sensors}
+                  IconChevronDown={IconChevronDown}
+                  IconChevronUp={IconChevronUp}
+                  arrayMove={arrayMove}
+                  playlistCollapsed={playlistCollapsed}
+                  setPlaylistCollapsed={setPlaylistCollapsed}
+                />
+              )}
+            </div>
+          )}
+          {/* Мини-плеер: показываем только если выбран трек и tab === 'search' */}
+          {tab === 'search' && selectedTrack && (
+            <MiniPlayer
+              asPortal={true}
+              selectedTrack={selectedTrack}
+              isPlaying={isPlaying}
+              onPlayPause={handlePlayPause}
+              onNext={playNext}
+              onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
+              progress={progress}
+              duration={duration}
+              formatTime={formatTime}
+              IconPlay={IconPlay}
+              IconPause={IconPause}
             />
           )}
         </div>
-      )}
-      {/* Мини-плеер: показываем только если выбран трек и tab === 'search' */}
-      {tab === 'search' && selectedTrack && (
-        <MiniPlayer
-          asPortal={true}
-          selectedTrack={selectedTrack}
-          isPlaying={isPlaying}
-          onPlayPause={handlePlayPause}
-          onNext={playNext}
-          onClose={() => { setSelectedTrack(null); setIsPlaying(false); }}
-          progress={progress}
-          duration={duration}
-          formatTime={formatTime}
-          IconPlay={IconPlay}
-          IconPause={IconPause}
-        />
-      )}
+      </div>
     </ErrorBoundary>
   );
 }
