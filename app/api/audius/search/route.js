@@ -61,31 +61,50 @@ export async function GET(request) {
     
     for (const provider of providers) {
       try {
-        const url = `${provider}/v1/tracks/search?query=${encodeURIComponent(query.trim())}&app_name=audiofeel&limit=${limit}&offset=${offset}`;
+        // Пробуем разные варианты URL для поиска
+        const urls = [
+          `${provider}/v1/tracks/search?query=${encodeURIComponent(query.trim())}&app_name=audiofeel&limit=${limit}&offset=${offset}`,
+          `${provider}/tracks/search?query=${encodeURIComponent(query.trim())}&app_name=audiofeel&limit=${limit}&offset=${offset}`,
+          `${provider}/v1/tracks/search?query=${encodeURIComponent(query.trim())}&limit=${limit}&offset=${offset}`,
+          `${provider}/tracks/search?query=${encodeURIComponent(query.trim())}&limit=${limit}&offset=${offset}`
+        ];
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
+        let success = false;
+        let response = null;
+        let data = null;
+        
+        for (const url of urls) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
 
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json',
-          },
-          signal: controller.signal
-        });
+            response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'application/json',
+              },
+              signal: controller.signal
+            });
 
-        clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-        if (!response.ok) {
-          console.warn(`Provider ${provider} failed: HTTP ${response.status}`);
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            if (response.ok) {
+              data = await response.json();
+              if (data && Array.isArray(data.data)) {
+                success = true;
+                break;
+              }
+            }
+          } catch (urlError) {
+            console.warn(`URL ${url} failed:`, urlError.message);
+            continue;
+          }
         }
-
-        const data = await response.json();
         
-        if (!data || !Array.isArray(data.data)) {
-          throw new Error('Invalid response format');
+        if (!success || !data) {
+          console.warn(`Provider ${provider} failed: HTTP ${response?.status || 'fetch failed'}`);
+          throw new Error(`HTTP ${response?.status || 'fetch failed'}: ${response?.statusText || 'Network error'}`);
         }
 
         console.log(`Search successful via ${provider}: ${data.data.length} tracks`);

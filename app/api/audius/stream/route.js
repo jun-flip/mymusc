@@ -41,34 +41,53 @@ export async function GET(request) {
       triedProviders.push(provider);
       
       try {
-        const url = `${provider}/v1/tracks/${trackId}/stream`;
+        // Пробуем разные варианты URL для стриминга
+        const urls = [
+          `${provider}/v1/tracks/${trackId}/stream`,
+          `${provider}/tracks/${trackId}/stream`,
+          `${provider}/v1/tracks/${trackId}/stream?app_name=audiofeel`,
+          `${provider}/tracks/${trackId}/stream?app_name=audiofeel`
+        ];
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 секунд таймаут
+        let success = false;
+        let response = null;
+        
+        for (const url of urls) {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 секунд таймаут
 
-        const response = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'audio/*, application/json',
-          },
-          signal: controller.signal
-        });
+            response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'audio/*, application/json',
+              },
+              signal: controller.signal
+            });
 
-        clearTimeout(timeoutId);
+            clearTimeout(timeoutId);
 
-        if (!response.ok) {
+            if (response.ok) {
+              success = true;
+              break;
+            }
+          } catch (urlError) {
+            console.warn(`URL ${url} failed:`, urlError.message);
+            continue;
+          }
+        }
+        
+        if (!success || !response) {
           const errorDetails = {
             provider: provider,
-            status: response.status,
-            statusText: response.statusText,
-            url: url
+            status: response?.status,
+            statusText: response?.statusText,
+            urls: urls
           };
           
-          // Логируем детали ошибки для диагностики
           console.warn(`Provider ${provider} failed for track ${trackId}:`, errorDetails);
-          
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          throw new Error(`HTTP ${response?.status || 'fetch failed'}: ${response?.statusText || 'Network error'}`);
         }
 
         // Проверяем, что это аудио файл
