@@ -1,34 +1,5 @@
 import { NextResponse } from 'next/server';
-
-let cachedProviders = null;
-let lastFetch = 0;
-const CACHE_TTL = 1000 * 60 * 10; // 10 минут
-
-async function getProviders() {
-  const now = Date.now();
-  if (cachedProviders && now - lastFetch < CACHE_TTL) return cachedProviders;
-  try {
-    const res = await fetch('https://api.audius.co/v1/discovery_providers');
-    if (!res.ok) {
-      throw new Error(`Failed to fetch providers: ${res.status}`);
-    }
-    const data = await res.json();
-    if (data.data && Array.isArray(data.data)) {
-      cachedProviders = data.data.map(p => p.endpoint.replace(/\/$/, '') + '/v1');
-      lastFetch = now;
-      return cachedProviders;
-    }
-  } catch (error) {
-    console.error('Error fetching providers:', error);
-  }
-  // fallback
-  return [
-    'https://api.audius.co/v1',
-    'https://discoveryprovider.audius-prod-6.poised-bush-6f6f.audius.co/v1',
-    'https://discoveryprovider.audius-prod-7.poised-bush-6f6f.audius.co/v1',
-    'https://discoveryprovider.audius-prod-8.poised-bush-6f6f.audius.co/v1',
-  ];
-}
+import { getWorkingStreamProviders, COMMON_HEADERS } from '../../../../lib/providers';
 
 export async function GET(req, { params }) {
   try {
@@ -45,7 +16,7 @@ export async function GET(req, { params }) {
     }
 
     let lastError = null;
-    const providers = await getProviders();
+    const providers = await getWorkingStreamProviders();
     
     for (const base of providers) {
       try {
@@ -54,7 +25,8 @@ export async function GET(req, { params }) {
         
         const response = await fetch(url, { 
           redirect: 'manual',
-          timeout: 10000 // 10 секунд таймаут
+          timeout: 10000,
+          headers: COMMON_HEADERS
         });
         
         if (response.status === 302) {
@@ -84,7 +56,17 @@ export async function GET(req, { params }) {
       }
     }
     
-    console.error('All providers failed, last error:', lastError);
+    console.error('All stream providers failed, last error:', lastError);
+    
+    // Fallback для демо-треков
+    if (id === '12345' || id === '67890') {
+      console.log('Returning demo stream for track:', id);
+      const demoUrl = id === '12345' 
+        ? 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav'
+        : 'https://www.soundjay.com/misc/sounds/bell-ringing-05.wav';
+      return NextResponse.redirect(demoUrl);
+    }
+    
     return NextResponse.json({ 
       error: 'All Audius providers failed', 
       details: lastError,
