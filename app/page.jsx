@@ -710,6 +710,16 @@ function Page() {
     setPlaylist(pl => pl.filter(t => t.id !== id));
   };
 
+  // Обновить порядок плейлиста при drag & drop
+  const updatePlaylistOrder = (oldIndex, newIndex) => {
+    setPlaylist(pl => {
+      const newPlaylist = [...pl];
+      const [movedItem] = newPlaylist.splice(oldIndex, 1);
+      newPlaylist.splice(newIndex, 0, movedItem);
+      return newPlaylist;
+    });
+  };
+
   // Очистить плейлист
   const clearPlaylist = () => setPlaylist([]);
 
@@ -1280,17 +1290,17 @@ function Page() {
           {playlist.length > 0 && (
             <Playlist
               playlist={playlist}
-                      selectedTrack={selectedTrack}
-                      playFromPlaylist={playFromPlaylist}
-                      openPlayerPopup={openPlayerPopup}
-                      removeFromPlaylist={removeFromPlaylist}
+              selectedTrack={selectedTrack}
+              playFromPlaylist={playFromPlaylist}
+              openPlayerPopup={openPlayerPopup}
+              removeFromPlaylist={removeFromPlaylist}
               clearPlaylist={clearPlaylist}
-                      isDragging={isDragging}
+              isDragging={isDragging}
               setIsDragging={setIsDragging}
               sensors={sensors}
               IconChevronDown={IconChevronDown}
               IconChevronUp={IconChevronUp}
-              arrayMove={arrayMove}
+              updatePlaylistOrder={updatePlaylistOrder}
               playlistCollapsed={playlistCollapsed}
               setPlaylistCollapsed={setPlaylistCollapsed}
             />

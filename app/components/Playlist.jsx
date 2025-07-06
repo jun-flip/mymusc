@@ -15,7 +15,7 @@ function Playlist({
   sensors,
   IconChevronDown,
   IconChevronUp,
-  arrayMove,
+  updatePlaylistOrder,
   playlistCollapsed,
   setPlaylistCollapsed,
 }) {
@@ -47,7 +47,7 @@ function Playlist({
               if (active.id !== over?.id) {
                 const oldIndex = playlist.findIndex(t => t.id === active.id);
                 const newIndex = playlist.findIndex(t => t.id === over.id);
-                arrayMove(playlist, oldIndex, newIndex);
+                updatePlaylistOrder(oldIndex, newIndex);
               }
             }}
             onDragCancel={() => setIsDragging(false)}
