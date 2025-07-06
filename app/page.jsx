@@ -1033,16 +1033,6 @@ function Page() {
         />
         
         <div className="main-content">
-          <div className="search-section">
-            <SearchForm 
-              onSearch={searchTracks}
-              isLoading={isSearching}
-              searchResults={searchResults}
-              loadMore={loadMoreTracks}
-              hasMore={hasMoreResults}
-            />
-          </div>
-
           <BurgerMenu tab={tab} setTab={setTab} theme={theme} setTheme={setTheme} lang={lang} setLang={setLang} t={t} />
           <PseudoRandomEQ isPlaying={isPlaying && !!selectedTrack} barCount={96} />
           {selectedTrack && selectedTrack.streamId && (
@@ -1132,42 +1122,119 @@ function Page() {
           {tab === 'search' && (
           <div className="App">
             <h1><span style={{ color: '#ff5500' }}>FREE</span>ZBY</h1>
-            {!loading && (!tracks || tracks.length === 0) && (
-                <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>{t.nothingFound}</div>
-            )}
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              {Array.isArray(tracks) && tracks.map((track, idx) => {
-                if (!track || !track.id) {
-                  console.warn('Skipping invalid track in render:', track);
-                  return null;
-                }
-                return (
-                  <TrackCard
-                    key={track.id}
-                    track={track}
-                    idx={idx}
-                    selectedTrack={selectedTrack}
-                    isPlaying={isPlaying}
-                    progress={selectedTrack && track.id === selectedTrack.id ? progress : 0}
-                    duration={selectedTrack && track.id === selectedTrack.id ? duration : 0}
-                    playFromSearch={safePlayFromSearch}
-                    openPlayerPopup={safeOpenPlayerPopup}
-                    addToPlaylist={safeAddToPlaylist}
-                    IconPlay={IconPlay}
-                    IconPause={IconPause}
-                    IconPlaylistAdd={IconPlaylistAdd}
-                    isTrackUnavailable={isTrackUnavailable}
-                    aria-label={`Воспроизвести трек ${track.title || 'Без названия'}`}
-                  />
-                );
-              })}
-            </ul>
-            {hasMore && !loading && (
-              <div style={{ textAlign: 'center', margin: '20px 0' }}>
-                  <button onClick={loadMoreTracks} style={{ padding: 10, fontSize: 16 }}>{t.next}</button>
-                </div>
-              )}
+            
+            {/* Форма поиска */}
+            <div className="search-section">
+              <SearchForm 
+                onSearch={searchTracks}
+                isLoading={isSearching}
+                searchResults={searchResults}
+                loadMore={loadMoreTracks}
+                hasMore={hasMoreResults}
+              />
             </div>
+
+            {/* Показываем результаты поиска */}
+            {searchResults && searchResults.length > 0 && (
+              <>
+                <ul style={{ listStyle: 'none', padding: 0 }}>
+                  {searchResults.map((track, idx) => {
+                    if (!track || !track.id) {
+                      console.warn('Skipping invalid track in render:', track);
+                      return null;
+                    }
+                    return (
+                      <TrackCard
+                        key={track.id}
+                        track={track}
+                        idx={idx}
+                        selectedTrack={selectedTrack}
+                        isPlaying={isPlaying}
+                        progress={selectedTrack && track.id === selectedTrack.id ? progress : 0}
+                        duration={selectedTrack && track.id === selectedTrack.id ? duration : 0}
+                        playFromSearch={safePlayFromSearch}
+                        openPlayerPopup={safeOpenPlayerPopup}
+                        addToPlaylist={safeAddToPlaylist}
+                        IconPlay={IconPlay}
+                        IconPause={IconPause}
+                        IconPlaylistAdd={IconPlaylistAdd}
+                        isTrackUnavailable={isTrackUnavailable}
+                        aria-label={`Воспроизвести трек ${track.title || 'Без названия'}`}
+                      />
+                    );
+                  })}
+                </ul>
+                
+                {/* Кнопка "Загрузить еще" для результатов поиска */}
+                {hasMoreResults && !isSearching && (
+                  <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                    <button 
+                      onClick={loadMoreTracks} 
+                      style={{ 
+                        padding: '12px 24px', 
+                        fontSize: 16,
+                        backgroundColor: '#ff5500',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Загрузить еще
+                    </button>
+                  </div>
+                )}
+                
+                {/* Индикатор загрузки для "Загрузить еще" */}
+                {isSearching && hasMoreResults && (
+                  <div style={{ textAlign: 'center', margin: '20px 0', color: '#666' }}>
+                    Загрузка дополнительных результатов...
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Показываем старые треки если нет результатов поиска */}
+            {(!searchResults || searchResults.length === 0) && !isSearching && (
+              <>
+                {!loading && (!tracks || tracks.length === 0) && (
+                  <div style={{ textAlign: 'center', color: '#aaa', marginTop: 30 }}>{t.nothingFound}</div>
+                )}
+                <ul style={{ listStyle: 'none', padding: 0 }}>
+                  {Array.isArray(tracks) && tracks.map((track, idx) => {
+                    if (!track || !track.id) {
+                      console.warn('Skipping invalid track in render:', track);
+                      return null;
+                    }
+                    return (
+                      <TrackCard
+                        key={track.id}
+                        track={track}
+                        idx={idx}
+                        selectedTrack={selectedTrack}
+                        isPlaying={isPlaying}
+                        progress={selectedTrack && track.id === selectedTrack.id ? progress : 0}
+                        duration={selectedTrack && track.id === selectedTrack.id ? duration : 0}
+                        playFromSearch={safePlayFromSearch}
+                        openPlayerPopup={safeOpenPlayerPopup}
+                        addToPlaylist={safeAddToPlaylist}
+                        IconPlay={IconPlay}
+                        IconPause={IconPause}
+                        IconPlaylistAdd={IconPlaylistAdd}
+                        isTrackUnavailable={isTrackUnavailable}
+                        aria-label={`Воспроизвести трек ${track.title || 'Без названия'}`}
+                      />
+                    );
+                  })}
+                </ul>
+                {hasMore && !loading && (
+                  <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                    <button onClick={loadMoreTracks} style={{ padding: 10, fontSize: 16 }}>{t.next}</button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
           )}
           {tab === 'player' && (
             <div className="App app-player">

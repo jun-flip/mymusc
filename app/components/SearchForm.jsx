@@ -94,84 +94,11 @@ function SearchForm({ onSearch, isLoading, searchResults, loadMore, hasMore }) {
         </div>
       )}
 
-      {/* Результаты поиска */}
-      {searchResults && searchResults.length > 0 && (
-        <div className="search-results">
-          <h3>Результаты поиска ({searchResults.length})</h3>
-          <ul className="tracks-list">
-            {searchResults.map((track, index) => (
-              <li key={track.id || index} className="track-item">
-                <div className="track-info">
-                  <img 
-                    src={track.artwork?.['150x150'] || 'https://audius.co/favicon.ico'} 
-                    alt={track.title || 'Track artwork'}
-                    onError={(e) => {
-                      e.target.src = 'https://audius.co/favicon.ico';
-                    }}
-                    style={{ width: 50, height: 50, borderRadius: 8, marginRight: 10 }}
-                  />
-                  <div>
-                    <div className="track-title">{track.title || 'Без названия'}</div>
-                    <div className="track-artist">{track.user?.name || 'Неизвестный исполнитель'}</div>
-                  </div>
-                </div>
-                <button 
-                  className="play-button"
-                  onClick={() => {
-                    // Здесь должна быть логика воспроизведения
-                    console.log('Play track:', track);
-                  }}
-                  aria-label={`Воспроизвести ${track.title || 'трек'}`}
-                >
-                  ▶
-                </button>
-              </li>
-            ))}
-          </ul>
-          
-          {/* Кнопка "Загрузить еще" */}
-          {hasMore && (
-            <button 
-              onClick={handleLoadMore}
-              disabled={isLoading}
-              className="load-more-button"
-              style={{
-                width: '100%',
-                padding: '12px',
-                marginTop: '20px',
-                backgroundColor: '#ff5500',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                cursor: isLoading ? 'not-allowed' : 'pointer',
-                opacity: isLoading ? 0.6 : 1
-              }}
-            >
-              {isLoading ? 'Загрузка...' : 'Загрузить еще'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Сообщение об отсутствии результатов */}
-      {searchResults && searchResults.length === 0 && !isLoading && query && !error && (
-        <div className="no-results" style={{
-          textAlign: 'center',
-          padding: '40px 20px',
-          color: '#666'
-        }}>
-          <p>По запросу "{query}" ничего не найдено</p>
-          <p style={{ fontSize: '14px', marginTop: '10px' }}>
-            Попробуйте изменить поисковый запрос или поищите "demo" для тестовых треков
-          </p>
-        </div>
-      )}
-
       {/* Индикатор загрузки */}
       {isLoading && (
         <div className="loading-indicator" style={{
           textAlign: 'center',
-          padding: '40px 20px',
+          padding: '20px',
           color: '#666'
         }}>
           <div style={{ fontSize: '24px', marginBottom: '10px' }}>🔍</div>
